@@ -173,7 +173,7 @@ max_length = 30
 # model = GPT.from_pretrained('gpt2') <- removed in favor of next line, which initialises a random model
 model = GPT(GPTConfig())
 model.eval()
-model.to('cuda')
+model.to(device)
 
 # prefix tokens
 import tiktoken
