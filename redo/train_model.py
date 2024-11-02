@@ -166,21 +166,44 @@ if torch.cuda.is_available():
 elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
     device = "mps"
 print(f"using device: {device}")
+device = "cpu" # temp OVERIDE
 
-num_return_sequences = 5
-max_length = 30
+# get a batch (of data)
+import tiktoken
+enc = tiktoken.get_encoding('gpt2')
+with open('input.txt', 'r') as f:
+    text = f.read()
+text = text[:1000]
+tokens = enc.encode(text)
+B, T = 4, 32
+buf = torch.tensor(tokens[:B*T + 1])
+x = buf[:-1].view(B, T)
+y = buf[1:].view(B, T)
+
+# get the logits
+model = GPT(GPTConfig())
+model.to(device)
+logits = model(x)
+
+print(logits.shape)
+import sys; sys.exit(0)
 
 # model = GPT.from_pretrained('gpt2') <- removed in favor of next line, which initialises a random model
-model = GPT(GPTConfig())
+'''model = GPT(GPTConfig())
 model.eval()
-model.to(device)
+model.to(device)'''
 
 # prefix tokens
-import tiktoken
+'''import tiktoken
 enc = tiktoken.get_encoding('gpt2')
 tokens = enc.encode("Hello, I'm a language model,")
 tokens = torch.tensor(tokens, dtype=torch.long) # (8,)
-tokens = tokens.unsqueeze(0).repeat(num_return_sequences, 1) # (5, 8)
+tokens = tokens.unsqueeze(0).repeat(num_return_sequences, 1) # (5, 8)'''
+
+model.eval()
+
+num_return_sequences = 5
+max_length = 30
 x = tokens.to('cuda')
 
 # generate! right now x is (B, T) where B = 5, T = 8
