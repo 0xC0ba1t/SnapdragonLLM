@@ -222,7 +222,6 @@ if torch.cuda.is_available():
 elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
     device = "mps"
 print(f"using device: {device}")
-device = "cpu" # temp OVERIDE
 
 train_loader = DataLoaderLite(B=4, T=32)
 # get the logits
