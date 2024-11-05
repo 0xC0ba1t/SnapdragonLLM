@@ -244,7 +244,7 @@ model = torch.compile(model)
 print('model compiled successfully')
 
 # lr scheduler
-max_lr = 3e-4
+max_lr = 6e-4
 min_lr = max_lr * 0.1
 warmup_steps = 10
 max_steps = 50
