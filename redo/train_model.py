@@ -237,7 +237,7 @@ train_loader = DataLoaderLite(B=8, T=1024) # configured for L4 GPU
 torch.set_float32_matmul_precision('high') # tf32
 
 # get the logits
-model = GPT(GPTConfig())
+model = GPT(GPTConfig(vocab_size=50304))
 model.to(device)
 print('compiling model...')
 model = torch.compile(model)
