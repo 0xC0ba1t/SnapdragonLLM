@@ -256,7 +256,7 @@ torch.manual_seed(1337)
 if torch.cuda.is_available():
     torch.cuda.manual_seed(1337)
 
-train_loader = DataLoaderLite(B=8, T=1024) # configured for L4 GPU
+train_loader = DataLoaderLite(B=16, T=1024) # configured for L4 GPU
 
 torch.set_float32_matmul_precision('high') # tf32
 

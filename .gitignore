@@ -6,3 +6,4 @@ redo/input.txt
 .idea/
 .wget-hsts
 .vscode/
+.triton/
