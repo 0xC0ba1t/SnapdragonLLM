@@ -264,7 +264,7 @@ grad_accum_steps = total_batch_size // (B * T)
 print(f"total desired batch size: {total_batch_size}")
 print(f"=> calculated gradient accumulation steps: {grad_accum_steps}")
 
-train_loader = DataLoaderLite(B=16, T=1024) # configured for L4 GPU
+train_loader = DataLoaderLite(B=B, T=T) # configured for L4 GPU
 
 torch.set_float32_matmul_precision('high') # tf32
 
