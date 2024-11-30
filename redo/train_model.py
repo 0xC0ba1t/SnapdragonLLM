@@ -5,6 +5,8 @@ import torch.nn as nn
 from torch.nn import functional as F
 import inspect
 import os
+import tiktoken
+import numpy as np
 
 # -----------------------------------------------------------------------------
 
@@ -211,25 +213,33 @@ class GPT(nn.Module):
 
 # -----------------------------------------------------------------------------
 
-import tiktoken
+def load_tokens(filename):
+    npt = np.load(filename)
+    ptt = torch.tensor(npt, dtype=torch.long)
+    return ptt
 
 class DataLoaderLite:
-    def __init__(self, B, T, process_rank, num_processes):
+    def __init__(self, B, T, process_rank, num_processes, split):
         self.B = B
         self.T = T
         self.process_rank = process_rank
         self.num_processes = num_processes
+        assert split in {'train', 'val'}
 
-        # load tokens at initialization from disk and store them in memory
-        with open('input.txt', 'r') as f:
-            text = f.read()
-        enc = tiktoken.get_encoding('gpt2')
-        tokens = enc.encode(text)
-        self.tokens = torch.tensor(tokens)
-        print(f"loaded {len(self.tokens)} tokens from disk")
-        print(f"1 epoch = {len(self.tokens) // (B * T)} batches")
-
-        # state
+        # get the filename of the shards
+        data_root = "edu_fineweb10B"
+        shards = os.listdir(data_root)
+        shards = [s for s in shards if split in s]
+        shards = sorted(shards)
+        shards = [os.path.join(data_root, s) for s in shards]
+        self.shards = shards
+        assert len(shards) > 0, f"no shards found for split: {split}"
+        if master_process:
+            print(f"found {len(shards)} shards for split: {split}")
+        
+        # state, init at shard zero
+        self.current_shard = 0
+        self.tokens = load_tokens(self.shards[self.current_shard])
         self.current_position = self.B * self.T * self.process_rank
     
     def next_batch(self):
@@ -239,9 +249,11 @@ class DataLoaderLite:
         y = (buf[1:].view(B, T)) # targets
         # advance position in the tensor
         self.current_position += B * T * self.num_processes
-        # if loading the next batch is not possible (due to the end of the tokens), reset the position
+        # if loading the next batch is not possible (out of bounds) then advance to next shard
         if self.current_position + (B * T * self.num_processes + 1) > len(self.tokens):
-            self.current_position = self.B * self.T * self.process_rank
+            self.current_shard = (self.current_shard + 1) % len(self.shards)
+            self.tokens = load_tokens(self.shards[self.current_shard])
+            self.current_position = B * T * self.process_rank
         return x, y
 
 # -----------------------------------------------------------------------------
@@ -253,9 +265,9 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
 
 # simple launch:
-# python train_gpt2.py
+# python train_model.py
 # DDP launch for e.g. 8 GPUs:
-# torchrun --standalone --nproc_per_node=8 train_gpt2.py
+# torchrun --standalone --nproc_per_node=8 train_model.py
 
 # set up DDP (distributed data parallel)
 # torchrun command sets the env vars RANK, LOCAL_RANK, and WORLD_SIZE
@@ -289,7 +301,7 @@ if torch.cuda.is_available():
     torch.cuda.manual_seed(1337)
 
 total_batch_size = 524288 # 2**19, ~0.5M, in num of toks
-B = 16 # micro batch size
+B = 32 # micro batch size
 T = 1024 # sequence length
 assert total_batch_size % (B * T * ddp_world_size) == 0, "make sure total_batch_size is divisible by B * T * ddp_world_size"
 grad_accum_steps = total_batch_size // (B * T * ddp_world_size)
@@ -297,7 +309,7 @@ if master_process:
     print(f"total desired batch size: {total_batch_size}")
     print(f"=> calculated gradient accumulation steps: {grad_accum_steps}")
 
-train_loader = DataLoaderLite(B=B, T=T, process_rank=ddp_rank, num_processes=ddp_world_size) # configured for multi GPU (in my case 4 x L4)
+train_loader = DataLoaderLite(B=B, T=T, process_rank=ddp_rank, num_processes=ddp_world_size, split="train") # configured for multi GPU (in my case 4 x L4)
 
 torch.set_float32_matmul_precision('high') # tf32
 
@@ -312,8 +324,8 @@ raw_model = model.module if ddp else model # always contains the "raw" unwrapped
 # lr scheduler
 max_lr = 6e-4
 min_lr = max_lr * 0.1
-warmup_steps = 10
-max_steps = 50
+warmup_steps = 715 # (375e6 / 2**19); based off of GPT-3 paper, where warmup is 375M toks, so warmup tok num / toks per step
+max_steps = 19073 # (10e9 / 2**19); total toks / toks per step
 def get_lr(it):
     # 1: linear warmup for warmup_iters steps
     if it < warmup_steps:
