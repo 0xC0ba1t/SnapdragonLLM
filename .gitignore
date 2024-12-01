@@ -2,6 +2,7 @@ openwebtext/
 old/
 redo/input.txt
 redo/edu_fineweb10B
+redo/__pycache__/
 .lightning_studio/
 .vscode-server/
 .idea/

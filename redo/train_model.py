@@ -220,6 +220,7 @@ class GPT(nn.Module):
 
 def load_tokens(filename):
     npt = np.load(filename)
+    npt = npt.astype(np.int32)
     ptt = torch.tensor(npt, dtype=torch.long)
     return ptt
 
@@ -387,7 +388,7 @@ with open(log_file, "w") as f: # open file in write mode
     pass
 
 # Start / Resume Training
-resume_training = True
+resume_training = False
 if resume_training:
     # get latest checkpoint file
     checkpoint_files = [f for f in os.listdir(log_dir) if f.startswith("model_") and f.endswith(".pt")]
