@@ -375,7 +375,7 @@ if master_process:
     print(f"total desired batch size: {total_batch_size}")
     print(f"=> calculated gradient accumulation steps: {grad_accum_steps}")
 
-train_loader = DataLoaderLite(B=B, T=T, process_rank=ddp_rank, num_processes=ddp_world_size, split="train") # configured for multi GPU (in my case 4 x L4)
+train_loader = DataLoaderLite(B=B, T=T, process_rank=ddp_rank, num_processes=ddp_world_size, split="train") # configured for multi GPU (in my case I have only 1x L40S
 val_loader = DataLoaderLite(B=B, T=T, process_rank=ddp_rank, num_processes=ddp_world_size, split="val")
 
 torch.set_float32_matmul_precision('high') # tf32
@@ -481,7 +481,7 @@ for step in range(max_steps):
             with open(log_file, "a") as f:
                 f.write(f"{step} val {val_loss_accum.item():.4f}\n")
 
-            if step > 0 and (step % 500 == 0 or last_step):
+            if step > 0 and (step % 25 == 0 or last_step):
                 # write model checkpoints
                 train_loader_checkpoint = {'current_shard': train_loader.current_shard, 'current_position': train_loader.current_position}
                 checkpoint_path = os.path.join(log_dir, f"model_{step:05d}.pt")
@@ -565,7 +565,7 @@ for step in range(max_steps):
     if master_process:
         print(f"step {step:4d} | loss: {loss_accum.item():.6f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt*1000:.2f}ms | toks_processed: {tokens_processed:.2f} | tok/sec: {tokens_per_sec:.2f}")
         with open(log_file, "a") as f:
-            f.write(f"{step} train {loss_accum.item():.6f\n}")
+            f.write(f"{step} train {loss_accum.item():.6f}\n")
 
 if ddp:
     destroy_process_group()

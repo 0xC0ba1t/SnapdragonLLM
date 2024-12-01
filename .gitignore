@@ -3,6 +3,8 @@ old/
 redo/input.txt
 redo/edu_fineweb10B
 redo/__pycache__/
+redo/hellaswag
+redo/log/
 .lightning_studio/
 .vscode-server/
 .idea/
