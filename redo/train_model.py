@@ -388,7 +388,7 @@ with open(log_file, "w") as f: # open file in write mode
     pass
 
 # Start / Resume Training
-resume_training = False
+resume_training = True
 if resume_training:
     # get latest checkpoint file
     checkpoint_files = [f for f in os.listdir(log_dir) if f.startswith("model_") and f.endswith(".pt")]
@@ -481,19 +481,19 @@ for step in range(max_steps):
             with open(log_file, "a") as f:
                 f.write(f"{step} val {val_loss_accum.item():.4f}\n")
 
-        if step > 0 and (step % 25 == 0 or last_step):
-            # write model checkpoints
-            train_loader_checkpoint = {'current_shard': train_loader.current_shard, 'current_position': train_loader.current_position}
-            checkpoint_path = os.path.join(log_dir, f"model_{step:05d}.pt")
-            checkpoint = {
-                'model': raw_model.state_dict(),
-                'optimizer': optimizer.state_dict(),
-                'config': raw_model.config,
-                'step': step,
-                'val_loss': val_loss_accum.item(),
-                'train_loader': train_loader_checkpoint,
-            }
-            torch.save(checkpoint, checkpoint_path)
+    if step > 0 and (step % 25 == 0 or last_step):
+        # write model checkpoints
+        train_loader_checkpoint = {'current_shard': train_loader.current_shard, 'current_position': train_loader.current_position}
+        checkpoint_path = os.path.join(log_dir, f"model_{step:05d}.pt")
+        checkpoint = {
+            'model': raw_model.state_dict(),
+            'optimizer': optimizer.state_dict(),
+            'config': raw_model.config,
+            'step': step,
+            'val_loss': val_loss_accum.item(),
+            'train_loader': train_loader_checkpoint,
+        }
+        torch.save(checkpoint, checkpoint_path)
 
     # eval hellaswag once in a while
     if (step % 250 == 0 or last_step): # execute every 250th iter, or at the last step, ONLY if not using compile
