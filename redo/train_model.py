@@ -382,6 +382,7 @@ torch.set_float32_matmul_precision('high') # tf32
 
 # create a log dir that checkpoints and logs will be written to
 log_dir = "log"
+# log_dir_model_checkpoints = ""
 os.makedirs(log_dir, exist_ok=True)
 log_file = os.path.join(log_dir, f"log.txt")
 with open(log_file, "w") as f: # open file in write mode
@@ -410,6 +411,9 @@ if resume_training:
     train_loader.set(checkpoint['train_loader'])
     if master_process:
         print(f"resuming training from step {current_step} with a validation loss of {checkpoint['val_loss']:.4f}")
+        with open(log_file, "a") as f:
+            f.write(f"resuming training from step {current_step} with a validation loss of {checkpoint['val_loss']:.4f}\n")
+
 else:
     # create model
     model = GPT(GPTConfig(vocab_size=50304)) # increase vocabsize to make it have more factors of 2

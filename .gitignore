@@ -5,6 +5,7 @@ redo/edu_fineweb10B
 redo/__pycache__/
 redo/hellaswag
 redo/log/
+redo/log_*/
 .lightning_studio/
 .vscode-server/
 .idea/
