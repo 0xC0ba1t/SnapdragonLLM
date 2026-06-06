@@ -12,3 +12,22 @@ redo/log_*/
 .wget-hsts
 .vscode/
 .triton/
+# v3
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+data/
+runs/
+checkpoints/
+wandb/
+tensorboard/
+*.bin
+*.idx
+*.pt
+.venv/
+legacy/v2/edu_fineweb10B
+legacy/v2/log/
