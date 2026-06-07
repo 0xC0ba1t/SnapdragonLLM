@@ -20,5 +20,5 @@ def test_autocast_dtype(name, dtype):
 
 
 def test_autocast_dtype_rejects_unknown():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="unknown precision"):
         autocast_dtype("int4")
