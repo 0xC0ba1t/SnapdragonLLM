@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "snapdragon"
+version = "0.3.0"
+description = "From-scratch 500M parameter LLM, optimised to train on a single 12-16GB GPU"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "AGPL-3.0-or-later" }
+dependencies = [
+    "torch>=2.5",
+    "numpy>=1.26",
+    "pyyaml>=6.0",
+    "tqdm>=4.66",
+    "tokenizers>=0.20",
+    "safetensors>=0.4",
+]
+
+[project.optional-dependencies]
+data = ["datasets>=2.20"]
+logging = ["tensorboard>=2.16", "wandb>=0.17"]
+dev = ["pytest>=8", "ruff>=0.6", "pre-commit>=3.7"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+snapdragon = ["py.typed"]
