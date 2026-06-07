@@ -28,3 +28,22 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 snapdragon = ["py.typed"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests", "scripts"]
+extend-exclude = ["legacy"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "NPY", "PT"]
+ignore = ["E501", "B905"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "gpu: needs a CUDA device",
+    "slow: takes more than a few seconds",
+]
+addopts = "-ra"
