@@ -28,3 +28,11 @@ def test_non_mapping_rejected(tmp_path):
     path.write_text("- 1\n- 2\n")
     with pytest.raises(ValueError, match="mapping"):
         read_yaml(path)
+
+
+def test_load_with_overrides(tmp_path):
+    path = tmp_path / "c.yaml"
+    dump_config(Config(), path)
+    cfg = load_config(path, ["train.micro_batch_size=2", "optim.adam_lr=1e-3"])
+    assert cfg.train.micro_batch_size == 2
+    assert cfg.optim.adam_lr == pytest.approx(1e-3)

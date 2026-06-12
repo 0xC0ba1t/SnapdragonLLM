@@ -1,6 +1,7 @@
 """Reading and writing configs as YAML."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -8,6 +9,7 @@ from typing import Any
 import yaml
 
 from snapdragon.config.loader import from_dict
+from snapdragon.config.overrides import apply_overrides
 from snapdragon.config.schema import Config
 
 
@@ -39,5 +41,6 @@ def read_yaml(path: str | Path) -> dict[str, Any]:
     return data
 
 
-def load_config(path: str | Path) -> Config:
-    return from_dict(Config, read_yaml(path))
+def load_config(path: str | Path, overrides: Iterable[str] = ()) -> Config:
+    """Load a YAML config, apply ``section.key=value`` overrides, and validate it."""
+    return from_dict(Config, apply_overrides(read_yaml(path), overrides))
