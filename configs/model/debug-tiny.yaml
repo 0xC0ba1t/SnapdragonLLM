@@ -1,0 +1,9 @@
+# ~0.2M params, for CPU tests and smoke runs
+model:
+  vocab_size: 512
+  d_model: 64
+  n_layers: 2
+  n_heads: 4
+  n_kv_heads: 2
+  mlp_hidden: 192
+  max_seq_len: 128

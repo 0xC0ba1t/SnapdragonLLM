@@ -1,0 +1,12 @@
+# ~528M params
+model:
+  vocab_size: 32768
+  d_model: 1280
+  n_layers: 28
+  n_heads: 20
+  n_kv_heads: 5
+  mlp_hidden: 3456
+  max_seq_len: 2048
+  rope_theta: 500000.0
+  qk_norm: true
+  tie_embeddings: true

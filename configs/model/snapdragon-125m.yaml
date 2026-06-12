@@ -1,0 +1,9 @@
+# ~126M params, for fast iteration
+model:
+  vocab_size: 32768
+  d_model: 768
+  n_layers: 16
+  n_heads: 12
+  n_kv_heads: 4
+  mlp_hidden: 2048
+  max_seq_len: 2048
