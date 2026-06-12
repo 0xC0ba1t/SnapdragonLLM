@@ -36,3 +36,17 @@ def test_load_with_overrides(tmp_path):
     cfg = load_config(path, ["train.micro_batch_size=2", "optim.adam_lr=1e-3"])
     assert cfg.train.micro_batch_size == 2
     assert cfg.optim.adam_lr == pytest.approx(1e-3)
+
+
+def test_extends_merges_deeply(tmp_path):
+    (tmp_path / "base.yaml").write_text("train:\n  seed: 5\n  micro_batch_size: 8\n")
+    (tmp_path / "child.yaml").write_text("extends: base.yaml\ntrain:\n  micro_batch_size: 2\n")
+    cfg = load_config(tmp_path / "child.yaml")
+    assert (cfg.train.seed, cfg.train.micro_batch_size) == (5, 2)
+
+
+def test_circular_extends_detected(tmp_path):
+    (tmp_path / "a.yaml").write_text("extends: b.yaml\n")
+    (tmp_path / "b.yaml").write_text("extends: a.yaml\n")
+    with pytest.raises(ValueError, match="circular"):
+        load_config(tmp_path / "a.yaml")

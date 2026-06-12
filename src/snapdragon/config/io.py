@@ -33,12 +33,29 @@ def dump_config(cfg: Config, path: str | Path | None = None) -> str:
     return text
 
 
-def read_yaml(path: str | Path) -> dict[str, Any]:
+def deep_merge(base: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
+    out = dict(base)
+    for k, v in new.items():
+        if isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = deep_merge(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+
+def read_yaml(path: str | Path, _seen: tuple[Path, ...] = ()) -> dict[str, Any]:
+    """Read a YAML mapping. An ``extends: other.yaml`` key (relative path) is merged underneath."""
+    path = Path(path).resolve()
+    if path in _seen:
+        raise ValueError(f"circular extends: {' -> '.join(map(str, (*_seen, path)))}")
     with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     if not isinstance(data, dict):
         raise ValueError(f"{path}: top level of a config file must be a mapping")
-    return data
+    parent = data.pop("extends", None)
+    if parent is None:
+        return data
+    return deep_merge(read_yaml(path.parent / parent, (*_seen, path)), data)
 
 
 def load_config(path: str | Path, overrides: Iterable[str] = ()) -> Config:
