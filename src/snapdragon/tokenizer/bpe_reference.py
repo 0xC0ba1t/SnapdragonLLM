@@ -6,12 +6,15 @@ training runs use the fast HuggingFace-backed tokenizer in ``fast.py`` with the 
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
 
 from snapdragon.tokenizer.pretokenize import pretokenize
 from snapdragon.tokenizer.special_tokens import SPECIAL_TOKENS
+
+_SPECIAL_RE = re.compile("(" + "|".join(re.escape(t) for t in SPECIAL_TOKENS) + ")")
 
 Pair = tuple[int, int]
 
@@ -108,18 +111,33 @@ class BPETokenizer:
         self._cache[word] = ids
         return ids
 
-    def encode(self, text: str) -> list[int]:
+    @property
+    def special_ids(self) -> dict[str, int]:
+        first = 256 + len(self.merges)
+        return {tok: first + i for i, tok in enumerate(SPECIAL_TOKENS)}
+
+    def encode(self, text: str, allow_special: bool = True) -> list[int]:
+        """Encode text. Special token strings in the text become their ids unless disabled."""
         out: list[int] = []
-        for word in pretokenize(text):
-            out.extend(self._encode_word(word))
+        specials = self.special_ids
+        pieces = _SPECIAL_RE.split(text) if allow_special else [text]
+        for piece in pieces:
+            if allow_special and piece in specials:
+                out.append(specials[piece])
+                continue
+            for word in pretokenize(piece):
+                out.extend(self._encode_word(word))
         return out
 
     def decode(self, ids: Iterable[int]) -> str:
-        return b"".join(self.vocab[i] for i in ids).decode("utf-8", errors="replace")
+        by_id = {i: t.encode("utf-8") for t, i in self.special_ids.items()}
+        return b"".join(by_id[i] if i in by_id else self.vocab[i] for i in ids).decode(
+            "utf-8", errors="replace"
+        )
 
     @property
     def vocab_size(self) -> int:
-        return 256 + len(self.merges)
+        return 256 + len(self.merges) + len(SPECIAL_TOKENS)
 
     def save(self, path: str | Path) -> None:
         payload = {"type": "bpe-reference", "version": 1, "merges": [list(m) for m in self.merges]}

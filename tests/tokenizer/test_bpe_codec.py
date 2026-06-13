@@ -30,7 +30,7 @@ def test_untrained_text_falls_back_to_bytes(tok):
 
 
 def test_vocab_size(tok):
-    assert tok.vocab_size == 256 + len(tok.merges)
+    assert tok.vocab_size == 256 + len(tok.merges) + 7
 
 
 def test_save_load_roundtrip(tok, tmp_path):
@@ -47,3 +47,16 @@ def test_load_rejects_other_files(tmp_path):
     path.write_text('{"type": "something-else"}')
     with pytest.raises(ValueError, match="not a reference BPE"):
         BPETokenizer.load(path)
+
+
+def test_special_tokens_encode_to_single_ids(tok):
+    ids = tok.encode("<|bos|>hello<|eos|>")
+    assert ids[0] == tok.special_ids["<|bos|>"]
+    assert ids[-1] == tok.special_ids["<|eos|>"]
+    assert tok.decode(ids) == "<|bos|>hello<|eos|>"
+
+
+def test_special_tokens_can_be_treated_as_text(tok):
+    ids = tok.encode("<|bos|>", allow_special=False)
+    assert tok.special_ids["<|bos|>"] not in ids
+    assert tok.decode(ids) == "<|bos|>"
