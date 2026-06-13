@@ -73,3 +73,48 @@ def _apply_merge(words: dict[tuple[int, ...], int], pair: Pair, new_id: int):
 def num_merges_for(vocab_size: int) -> int:
     return vocab_size - 256 - len(SPECIAL_TOKENS)
 
+
+class BPETokenizer:
+    """Encode/decode given an ordered merge list (rank = position in the list)."""
+
+    def __init__(self, merges: list[Pair]) -> None:
+        self.merges = [tuple(m) for m in merges]
+        self.ranks: dict[Pair, int] = {m: i for i, m in enumerate(self.merges)}
+        self.vocab: dict[int, bytes] = {i: bytes([i]) for i in range(256)}
+        for i, (a, b) in enumerate(self.merges):
+            self.vocab[256 + i] = self.vocab[a] + self.vocab[b]
+        self._cache: dict[str, list[int]] = {}
+
+    @classmethod
+    def train(cls, texts: Iterable[str], vocab_size: int) -> BPETokenizer:
+        return cls(train_merges(count_words(texts), num_merges_for(vocab_size)))
+
+    def _encode_word(self, word: str) -> list[int]:
+        cached = self._cache.get(word)
+        if cached is not None:
+            return cached
+        ids = list(word.encode("utf-8"))
+        while len(ids) >= 2:
+            best_rank, best_pair = None, None
+            for pair in zip(ids, ids[1:]):
+                r = self.ranks.get(pair)
+                if r is not None and (best_rank is None or r < best_rank):
+                    best_rank, best_pair = r, pair
+            if best_pair is None:
+                break
+            ids = list(_merge_word(tuple(ids), best_pair, 256 + best_rank))
+        self._cache[word] = ids
+        return ids
+
+    def encode(self, text: str) -> list[int]:
+        out: list[int] = []
+        for word in pretokenize(text):
+            out.extend(self._encode_word(word))
+        return out
+
+    def decode(self, ids: Iterable[int]) -> str:
+        return b"".join(self.vocab[i] for i in ids).decode("utf-8", errors="replace")
+
+    @property
+    def vocab_size(self) -> int:
+        return 256 + len(self.merges)
