@@ -5,8 +5,10 @@ training runs use the fast HuggingFace-backed tokenizer in ``fast.py`` with the 
 """
 from __future__ import annotations
 
+import json
 from collections import Counter
 from collections.abc import Iterable
+from pathlib import Path
 
 from snapdragon.tokenizer.pretokenize import pretokenize
 from snapdragon.tokenizer.special_tokens import SPECIAL_TOKENS
@@ -118,3 +120,14 @@ class BPETokenizer:
     @property
     def vocab_size(self) -> int:
         return 256 + len(self.merges)
+
+    def save(self, path: str | Path) -> None:
+        payload = {"type": "bpe-reference", "version": 1, "merges": [list(m) for m in self.merges]}
+        Path(path).write_text(json.dumps(payload), encoding="utf-8")
+
+    @classmethod
+    def load(cls, path: str | Path) -> BPETokenizer:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        if payload.get("type") != "bpe-reference":
+            raise ValueError(f"{path}: not a reference BPE file")
+        return cls([tuple(m) for m in payload["merges"]])

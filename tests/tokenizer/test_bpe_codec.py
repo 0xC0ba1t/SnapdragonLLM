@@ -31,3 +31,19 @@ def test_untrained_text_falls_back_to_bytes(tok):
 
 def test_vocab_size(tok):
     assert tok.vocab_size == 256 + len(tok.merges)
+
+
+def test_save_load_roundtrip(tok, tmp_path):
+    path = tmp_path / "tok.json"
+    tok.save(path)
+    loaded = BPETokenizer.load(path)
+    assert loaded.merges == tok.merges
+    text = "the quick brown fox"
+    assert loaded.encode(text) == tok.encode(text)
+
+
+def test_load_rejects_other_files(tmp_path):
+    path = tmp_path / "x.json"
+    path.write_text('{"type": "something-else"}')
+    with pytest.raises(ValueError, match="not a reference BPE"):
+        BPETokenizer.load(path)
