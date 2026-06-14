@@ -28,14 +28,6 @@ def count_words(texts: Iterable[str]) -> Counter[tuple[int, ...]]:
     return words
 
 
-def _pair_counts(words: dict[tuple[int, ...], int]) -> Counter[Pair]:
-    pairs: Counter[Pair] = Counter()
-    for word, freq in words.items():
-        for a, b in zip(word, word[1:]):
-            pairs[(a, b)] += freq
-    return pairs
-
-
 def _merge_word(word: tuple[int, ...], pair: Pair, new_id: int) -> tuple[int, ...]:
     out: list[int] = []
     i = 0
@@ -52,27 +44,38 @@ def _merge_word(word: tuple[int, ...], pair: Pair, new_id: int) -> tuple[int, ..
 def train_merges(words: Counter[tuple[int, ...]], num_merges: int) -> list[Pair]:
     """Greedy BPE: repeatedly merge the most frequent adjacent pair.
 
-    Ties break toward the numerically smallest pair so training is deterministic.
+    Pair counts and a pair -> words index are updated incrementally after every merge, so a
+    step only touches the words containing the merged pair. Ties break toward the numerically
+    smallest pair so training is deterministic (and equal to the naive recount version).
     """
-    words = dict(words)
+    seqs = [list(w) for w in words]
+    freqs = list(words.values())
+    pair_counts: Counter[Pair] = Counter()
+    where: dict[Pair, set[int]] = {}
+    for i, seq in enumerate(seqs):
+        for pair in zip(seq, seq[1:]):
+            pair_counts[pair] += freqs[i]
+            where.setdefault(pair, set()).add(i)
+
     merges: list[Pair] = []
     for step in range(num_merges):
-        pairs = _pair_counts(words)
-        if not pairs:
+        pair_counts = +pair_counts  # drop zero/negative entries
+        if not pair_counts:
             break
-        best = min(pairs, key=lambda p: (-pairs[p], p))
+        best = min(pair_counts, key=lambda p: (-pair_counts[p], p))
         new_id = 256 + step
         merges.append(best)
-        words = _apply_merge(words, best, new_id)
+        for i in list(where.pop(best, ())):
+            seq, f = seqs[i], freqs[i]
+            for pair in zip(seq, seq[1:]):
+                pair_counts[pair] -= f
+            seqs[i] = list(_merge_word(tuple(seq), best, new_id))
+            seq = seqs[i]
+            for pair in zip(seq, seq[1:]):
+                pair_counts[pair] += f
+                where.setdefault(pair, set()).add(i)
+        pair_counts.pop(best, None)
     return merges
-
-
-def _apply_merge(words: dict[tuple[int, ...], int], pair: Pair, new_id: int):
-    merged: dict[tuple[int, ...], int] = {}
-    for word, freq in words.items():
-        key = _merge_word(word, pair, new_id) if len(word) > 1 else word
-        merged[key] = merged.get(key, 0) + freq
-    return merged
 
 
 def num_merges_for(vocab_size: int) -> int:
