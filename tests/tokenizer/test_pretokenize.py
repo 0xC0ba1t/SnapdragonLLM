@@ -18,3 +18,7 @@ def test_contractions():
 @pytest.mark.parametrize("text", ["", "   ", "a\n\nb", "naïve café 你好", "tab\tseparated", "emoji 🙂!"])
 def test_pretokenize_is_lossless(text):
     assert "".join(pretokenize(text)) == text
+
+
+def test_curly_apostrophe_contractions():
+    assert pretokenize("don’t stop") == ["don", "’t", " stop"]
