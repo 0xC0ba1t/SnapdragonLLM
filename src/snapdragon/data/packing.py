@@ -43,3 +43,11 @@ def split_window(window: torch.Tensor, seq_len: int) -> torch.Tensor:
         raise ValueError(f"seq_len {seq_len} must divide the window length {max_len}")
     pieces = [window[..., k * seq_len : k * seq_len + seq_len + 1] for k in range(max_len // seq_len)]
     return torch.stack(pieces, dim=-2).reshape(-1, seq_len + 1) if window.dim() > 1 else torch.stack(pieces)
+
+
+def mask_cross_document_targets(x: torch.Tensor, y: torch.Tensor, eos_id: int) -> torch.Tensor:
+    """Targets at positions where the input is <|eos|> are the *next* document's first token.
+
+    Predicting it is unlearnable noise (nothing links the two documents), so mark it ignored.
+    """
+    return torch.where(x == eos_id, torch.full_like(y, IGNORE_INDEX), y)

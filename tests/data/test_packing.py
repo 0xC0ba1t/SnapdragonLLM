@@ -43,3 +43,12 @@ def test_split_window_batched():
 def test_split_window_requires_divisor():
     with pytest.raises(ValueError, match="must divide"):
         split_window(torch.arange(9), 3)
+
+
+def test_cross_document_targets_are_ignored():
+    from snapdragon.data.packing import IGNORE_INDEX, mask_cross_document_targets
+
+    x = _x([1, 2, EOS, 3])
+    y = _x([2, EOS, 3, 4])
+    out = mask_cross_document_targets(x, y, EOS)
+    assert out.tolist() == [[2, EOS, IGNORE_INDEX, 4]]
