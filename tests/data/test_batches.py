@@ -2,23 +2,11 @@ import pytest
 import torch
 
 from snapdragon.data.batches import BatchBuilder
-from snapdragon.data.manifest import DatasetManifest, ShardInfo
-from snapdragon.data.memmap_dataset import TokenDataset
-from snapdragon.data.shards import ShardWriter
-
-
-def make_dataset(path, n_tokens, offset=0):
-    with ShardWriter(path, "train", shard_tokens=10**6, eos_id=65000) as w:
-        w.add_document(list(range(offset, offset + n_tokens - 1)))
-    m = DatasetManifest(vocab_size=65001, eos_id=65000)
-    m.shards = [ShardInfo(s, t, d, "train") for s, t, d in w.files]
-    m.save(path)
-    return TokenDataset(path)
 
 
 @pytest.fixture
-def ds(tmp_path):
-    return make_dataset(tmp_path, 4001)
+def ds(tmp_path, make_token_dataset):
+    return make_token_dataset(tmp_path, 4001)
 
 
 def test_shapes_and_shift(ds):
@@ -45,9 +33,9 @@ def test_ranks_together_equal_single_process(ds):
         assert torch.equal(want, got)
 
 
-def test_two_sources_are_both_used(tmp_path):
-    a = make_dataset(tmp_path / "a", 2001, offset=0)
-    b = make_dataset(tmp_path / "b", 2001, offset=30000)
+def test_two_sources_are_both_used(tmp_path, make_token_dataset):
+    a = make_token_dataset(tmp_path / "a", 2001, offset=0)
+    b = make_token_dataset(tmp_path / "b", 2001, offset=30000)
     bb = BatchBuilder([a, b], [1, 1], seq_len=16, micro_batch_size=16, seed=0)
     x, _ = bb.get_batch(0)
     firsts = x[:, 0].numpy()
