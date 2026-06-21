@@ -52,3 +52,20 @@ def test_seek_over_block_boundaries():
         s2.locate(g)
     assert s2.locate(9000) == a
     assert np.all(s.mixture.counts_before(9000) == s._counts)
+
+
+def test_ranks_partition_each_batch():
+    from snapdragon.data.sampler import batch_sample_indices
+
+    for batch in range(5):
+        seen = []
+        for rank in range(4):
+            seen.extend(batch_sample_indices(batch, 3, rank, 4))
+        assert seen == list(range(batch * 12, batch * 12 + 12))
+
+
+def test_bad_rank():
+    from snapdragon.data.sampler import batch_sample_indices
+
+    with pytest.raises(ValueError, match="out of range"):
+        batch_sample_indices(0, 2, 2, 2)

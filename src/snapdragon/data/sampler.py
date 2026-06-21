@@ -58,3 +58,15 @@ class Sampler:
         src = self.mixture.source_of(g)
         window = self.perms[src].index(int(self._counts[src]))
         return src, window
+
+
+def batch_sample_indices(batch: int, micro_batch_size: int, rank: int, world_size: int) -> range:
+    """Global sample indices rank ``rank`` reads for global micro-batch number ``batch``.
+
+    Batch ``n`` covers the contiguous samples [n*W*B, (n+1)*W*B) and each rank takes its own slice
+    of B, so the union over ranks is the same stream a single process would see.
+    """
+    if not 0 <= rank < world_size:
+        raise ValueError(f"rank {rank} out of range for world size {world_size}")
+    start = (batch * world_size + rank) * micro_batch_size
+    return range(start, start + micro_batch_size)
