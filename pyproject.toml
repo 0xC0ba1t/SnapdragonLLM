@@ -47,4 +47,4 @@ markers = [
     "gpu: needs a CUDA device",
     "slow: takes more than a few seconds",
 ]
-addopts = "-ra"
+addopts = "-ra --import-mode=importlib"
