@@ -4,6 +4,8 @@ from __future__ import annotations
 import queue
 import threading
 
+import torch
+
 from snapdragon.data.batches import BatchBuilder
 from snapdragon.data.loader import Batch
 
@@ -17,10 +19,13 @@ class PrefetchLoader:
     ``state_dict()`` is exactly the resume point even though the worker is ahead.
     """
 
-    def __init__(self, builder: BatchBuilder, start_batch: int = 0, depth: int = 4) -> None:
+    def __init__(
+        self, builder: BatchBuilder, start_batch: int = 0, depth: int = 4, pin_memory: bool = False
+    ) -> None:
         if depth < 1:
             raise ValueError("depth must be at least 1")
         self.builder = builder
+        self.pin_memory = pin_memory and torch.cuda.is_available()
         self.batch_index = start_batch
         self._queue: queue.Queue = queue.Queue(maxsize=depth)
         self._stop = threading.Event()
@@ -32,6 +37,8 @@ class PrefetchLoader:
             while not self._stop.is_set():
                 x, y = self.builder.get_batch(n)
                 item = Batch(x, y)
+                if self.pin_memory:
+                    item = item.pin()
                 while not self._stop.is_set():
                     try:
                         self._queue.put(item, timeout=0.1)

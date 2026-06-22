@@ -35,3 +35,12 @@ def test_resume_reproduces_the_stream(ds_path):
     resumed.load_state_dict(state)
     for want in expected:
         assert torch.equal(next(resumed).x, want)
+
+
+def test_batch_to_device_keeps_values():
+    from snapdragon.data.loader import Batch
+
+    b = Batch(torch.arange(6).view(2, 3), torch.arange(6).view(2, 3) + 1)
+    moved = b.to("cpu", non_blocking=False)
+    assert torch.equal(moved.x, b.x)
+    assert torch.equal(moved.y, b.y)

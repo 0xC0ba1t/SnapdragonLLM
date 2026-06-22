@@ -50,3 +50,8 @@ def test_close_stops_the_thread(ds_path):
     next(pre)
     pre.close()
     assert not pre._thread.is_alive()
+
+
+def test_pin_memory_flag_is_safe_without_cuda(ds_path):
+    with PrefetchLoader(_builder(ds_path), depth=2, pin_memory=True) as pre:
+        assert next(pre).x.shape == (4, 16)

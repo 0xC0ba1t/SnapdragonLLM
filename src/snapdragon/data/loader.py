@@ -13,6 +13,13 @@ class Batch:
     x: torch.Tensor  # (B, T) input tokens
     y: torch.Tensor  # (B, T) next-token targets
 
+    def pin(self) -> Batch:
+        """Page-lock host memory so the H2D copy can be asynchronous."""
+        return Batch(self.x.pin_memory(), self.y.pin_memory())
+
+    def to(self, device: torch.device | str, non_blocking: bool = True) -> Batch:
+        return Batch(self.x.to(device, non_blocking=non_blocking), self.y.to(device, non_blocking=non_blocking))
+
 
 class TrainLoader:
     """Iterates batch 0, 1, 2, ... and can be resumed at any batch number via state_dict."""
