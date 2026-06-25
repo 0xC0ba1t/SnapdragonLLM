@@ -29,3 +29,20 @@ def test_max_tokens_stops_early(small_tokenizer, tmp_path):
     m = tokenize_to_shards(DOCS, small_tokenizer, tmp_path, shard_tokens=10_000, val_tokens=0, max_tokens=150)
     total = m.total_tokens()
     assert 150 <= total < 150 + 100  # stopped within one document of the budget
+
+
+def test_filter_and_dedup_are_applied_and_counted(small_tokenizer, tmp_path):
+    from collections import Counter
+
+    from snapdragon.data.dedup import ExactDedup
+    from snapdragon.data.filters import QualityFilter
+
+    good = "abc defg hij klm nop qrs tuv " * 12
+    docs = [good, good.upper(), "tiny", good + " extra words here " * 10]
+    stats = Counter()
+    m = tokenize_to_shards(
+        docs, small_tokenizer, tmp_path, shard_tokens=10_000, val_tokens=0,
+        quality_filter=QualityFilter(min_chars=50), dedup=ExactDedup(), stats=stats,
+    )
+    assert stats == {"kept": 2, "dup": 1, "too_short": 1}
+    assert sum(s.docs for s in m.shards) == 2
