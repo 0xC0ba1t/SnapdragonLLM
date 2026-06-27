@@ -44,3 +44,12 @@ def test_batch_to_device_keeps_values():
     moved = b.to("cpu", non_blocking=False)
     assert torch.equal(moved.x, b.x)
     assert torch.equal(moved.y, b.y)
+
+
+def test_with_doc_info_adds_position_ids():
+    from snapdragon.data.loader import Batch
+
+    x = torch.tensor([[1, 2, 9, 3, 4]])
+    b = Batch(x, x.clone()).with_doc_info(eos_id=9)
+    assert b.position_ids.tolist() == [[0, 1, 2, 0, 1]]
+    assert b.to("cpu", non_blocking=False).position_ids.tolist() == [[0, 1, 2, 0, 1]]

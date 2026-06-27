@@ -12,13 +12,24 @@ from snapdragon.data.batches import BatchBuilder
 class Batch:
     x: torch.Tensor  # (B, T) input tokens
     y: torch.Tensor  # (B, T) next-token targets
+    position_ids: torch.Tensor | None = None  # (B, T) optional, position within each document
+
+    def with_doc_info(self, eos_id: int) -> Batch:
+        """Attach per-document position ids (restarting after each <|eos|>) for packed training."""
+        from snapdragon.data.packing import position_ids_from_tokens
+
+        return Batch(self.x, self.y, position_ids_from_tokens(self.x, eos_id))
 
     def pin(self) -> Batch:
         """Page-lock host memory so the H2D copy can be asynchronous."""
-        return Batch(self.x.pin_memory(), self.y.pin_memory())
+        pos = self.position_ids.pin_memory() if self.position_ids is not None else None
+        return Batch(self.x.pin_memory(), self.y.pin_memory(), pos)
 
     def to(self, device: torch.device | str, non_blocking: bool = True) -> Batch:
-        return Batch(self.x.to(device, non_blocking=non_blocking), self.y.to(device, non_blocking=non_blocking))
+        pos = self.position_ids.to(device, non_blocking=non_blocking) if self.position_ids is not None else None
+        return Batch(
+            self.x.to(device, non_blocking=non_blocking), self.y.to(device, non_blocking=non_blocking), pos
+        )
 
 
 class TrainLoader:
