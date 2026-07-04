@@ -1,5 +1,6 @@
 import math
 
+import pytest
 import torch
 from torch import nn
 
@@ -18,10 +19,10 @@ def test_standard_and_residual_stds():
     cfg = _cfg()
     block = Block(cfg)
     init_weights(block, cfg)
-    assert block.attn.qkv_proj.weight.std().item() == __import__("pytest").approx(0.02, rel=0.05)
+    assert block.attn.qkv_proj.weight.std().item() == pytest.approx(0.02, rel=0.05)
     expected_res = 0.02 / math.sqrt(2 * cfg.n_layers)
-    assert block.attn.o_proj.weight.std().item() == __import__("pytest").approx(expected_res, rel=0.05)
-    assert block.mlp.down_proj.weight.std().item() == __import__("pytest").approx(expected_res, rel=0.05)
+    assert block.attn.o_proj.weight.std().item() == pytest.approx(expected_res, rel=0.05)
+    assert block.mlp.down_proj.weight.std().item() == pytest.approx(expected_res, rel=0.05)
 
 
 def test_embedding_and_norm_defaults():
