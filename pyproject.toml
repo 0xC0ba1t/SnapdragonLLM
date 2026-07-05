@@ -48,3 +48,6 @@ markers = [
     "slow: takes more than a few seconds",
 ]
 addopts = "-ra --import-mode=importlib"
+filterwarnings = [
+    "ignore:flex_attention called without torch.compile:UserWarning",
+]
