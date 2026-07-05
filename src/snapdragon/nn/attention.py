@@ -24,8 +24,14 @@ class Attention(nn.Module):
         self._split = (q_dim, kv_dim, kv_dim)
 
     def forward(
-        self, x: torch.Tensor, rope: RotaryEmbedding, position_ids: torch.Tensor | None = None
+        self,
+        x: torch.Tensor,
+        rope: RotaryEmbedding,
+        position_ids: torch.Tensor | None = None,
+        attn_mask=None,
     ) -> torch.Tensor:
+        """``attn_mask``: None for plain causal attention, a dense bool (B, 1, T, T) mask (True =
+        attend), or a FlexAttention BlockMask (document masking without O(T^2) memory)."""
         B, T, _ = x.shape
         q, k, v = self.qkv_proj(x).split(self._split, dim=-1)
         q = q.view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
@@ -33,5 +39,13 @@ class Attention(nn.Module):
         v = v.view(B, T, self.n_kv_heads, self.head_dim).transpose(1, 2)
         q, k = self.q_norm(q), self.k_norm(k)  # QK-norm keeps attention logits bounded
         q, k = rope(q, k, position_ids)
-        y = F.scaled_dot_product_attention(q, k, v, is_causal=True, enable_gqa=self.n_heads != self.n_kv_heads)
+        gqa = self.n_heads != self.n_kv_heads
+        if attn_mask is None:
+            y = F.scaled_dot_product_attention(q, k, v, is_causal=True, enable_gqa=gqa)
+        elif isinstance(attn_mask, torch.Tensor):
+            y = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask, enable_gqa=gqa)
+        else:
+            from torch.nn.attention.flex_attention import flex_attention
+
+            y = flex_attention(q, k, v, block_mask=attn_mask, enable_gqa=gqa)
         return self.o_proj(y.transpose(1, 2).reshape(B, T, -1))

@@ -70,3 +70,32 @@ def test_backward_runs(cfg):
     attn = Attention(cfg)
     attn(torch.randn(2, 6, 32), _rope(cfg)).sum().backward()
     assert all(p.grad is not None for p in attn.parameters())
+
+
+def test_document_mask_isolates_documents(cfg):
+    from snapdragon.data.packing import doc_ids_from_tokens, position_ids_from_tokens
+    from snapdragon.nn.docmask import dense_doc_mask
+
+    attn = Attention(cfg).eval()
+    rope = _rope(cfg)
+    eos = 63
+    tokens = torch.tensor([[1, 2, 3, eos, 4, 5, 6, 7]])
+    pos = position_ids_from_tokens(tokens, eos)
+    mask = dense_doc_mask(doc_ids_from_tokens(tokens, eos))
+    x = torch.randn(1, 8, 32)
+    y1 = attn(x, rope, pos, mask)
+    x2 = x.clone()
+    x2[:, :4] = torch.randn(1, 4, 32)  # change the whole first document
+    y2 = attn(x2, rope, pos, mask)
+    assert torch.allclose(y1[:, 4:], y2[:, 4:], atol=1e-5)  # second document unaffected
+    assert not torch.allclose(y1[:, :4], y2[:, :4], atol=1e-5)
+
+
+def test_dense_causal_mask_equals_default_path(cfg):
+    from snapdragon.nn.docmask import dense_doc_mask
+
+    attn = Attention(cfg).eval()
+    rope = _rope(cfg)
+    x = torch.randn(1, 8, 32)
+    one_doc = dense_doc_mask(torch.zeros(1, 8, dtype=torch.long))
+    assert torch.allclose(attn(x, rope), attn(x, rope, None, one_doc), atol=1e-5)

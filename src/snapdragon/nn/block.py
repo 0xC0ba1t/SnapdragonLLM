@@ -20,7 +20,11 @@ class Block(nn.Module):
         self.mlp = SwiGLU(cfg.d_model, cfg.mlp_hidden)
 
     def forward(
-        self, x: torch.Tensor, rope: RotaryEmbedding, position_ids: torch.Tensor | None = None
+        self,
+        x: torch.Tensor,
+        rope: RotaryEmbedding,
+        position_ids: torch.Tensor | None = None,
+        attn_mask=None,
     ) -> torch.Tensor:
-        x = x + self.attn(self.attn_norm(x), rope, position_ids)
+        x = x + self.attn(self.attn_norm(x), rope, position_ids, attn_mask)
         return x + self.mlp(self.mlp_norm(x))
