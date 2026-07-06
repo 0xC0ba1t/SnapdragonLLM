@@ -99,3 +99,17 @@ def test_dense_causal_mask_equals_default_path(cfg):
     x = torch.randn(1, 8, 32)
     one_doc = dense_doc_mask(torch.zeros(1, 8, dtype=torch.long))
     assert torch.allclose(attn(x, rope), attn(x, rope, None, one_doc), atol=1e-5)
+
+
+def test_flex_block_mask_path_matches_dense_mask(cfg):
+    from snapdragon.nn.docmask import FLEX_AVAILABLE, dense_doc_mask, flex_doc_block_mask
+
+    if not FLEX_AVAILABLE:
+        pytest.skip("no flexattention")
+    attn = Attention(cfg).eval()
+    rope = _rope(cfg)
+    doc = torch.tensor([[0] * 5 + [1] * 11])
+    x = torch.randn(1, 16, 32)
+    dense = attn(x, rope, None, dense_doc_mask(doc))
+    flex = attn(x, rope, None, flex_doc_block_mask(doc))
+    assert torch.allclose(dense, flex, atol=1e-5)
