@@ -32,7 +32,8 @@ def test_only_total_loss_carries_grad():
     assert w.grad is not None
 
 
-def test_zero_z_coeff():
+def test_zero_z_coeff_leaves_loss_equal_to_ce_but_still_reports_z():
     h, w, t = _data()
     out = lm_loss(h, w, t, z_loss_coeff=0.0)
-    assert out.z.item() == 0.0
+    assert torch.allclose(out.loss.detach(), out.ce)
+    assert out.z.item() > 0.0  # logsumexp^2 is a useful diagnostic even when it is not penalised

@@ -77,7 +77,8 @@ class _ChunkedCE(torch.autograd.Function):
         n_valid = valid.sum().clamp(min=1)
         acc = torch.promote_types(hidden.dtype, torch.float32)
         lse_all = torch.empty(hidden.shape[0], dtype=acc, device=hidden.device)
-        total = torch.zeros((), dtype=acc, device=hidden.device)
+        ce_sum = torch.zeros((), dtype=acc, device=hidden.device)
+        z_sum = torch.zeros((), dtype=acc, device=hidden.device)
         for start in range(0, hidden.shape[0], chunk_tokens):
             sl = slice(start, start + chunk_tokens)
             logits = _logits(hidden[sl], w)
@@ -85,13 +86,16 @@ class _ChunkedCE(torch.autograd.Function):
             lse_all[sl] = lse
             tgt = logits.gather(1, targets[sl].clamp(min=0).unsqueeze(1)).squeeze(1)
             v = valid[sl]
-            total = total + ((lse - tgt) * v).sum() + z_loss_coeff * (lse.pow(2) * v).sum()
+            ce_sum = ce_sum + ((lse - tgt) * v).sum()
+            z_sum = z_sum + (lse.pow(2) * v).sum()
         ctx.save_for_backward(hidden, weight, targets, lse_all, n_valid)
         ctx.z, ctx.chunk, ctx.ignore = z_loss_coeff, chunk_tokens, ignore_index
-        return total / n_valid
+        ce, z = ce_sum / n_valid, z_sum / n_valid
+        ctx.mark_non_differentiable(ce, z)
+        return ce + z_loss_coeff * z, ce, z
 
     @staticmethod
-    def backward(ctx, grad_out):
+    def backward(ctx, grad_out, _grad_ce, _grad_z):
         hidden, weight, targets, lse_all, n_valid = ctx.saved_tensors
         w = weight.to(hidden.dtype)
         valid = targets != ctx.ignore
@@ -121,4 +125,17 @@ def chunked_ce(
     ignore_index: int = IGNORE_INDEX,
 ) -> torch.Tensor:
     """Memory-lean fused linear + cross-entropy (+ z-loss). hidden (N, d), weight (V, d), targets (N,)."""
+    return _ChunkedCE.apply(hidden, weight, targets, z_loss_coeff, chunk_tokens, ignore_index)[0]
+
+
+def chunked_ce_with_stats(
+    hidden: torch.Tensor,
+    weight: torch.Tensor,
+    targets: torch.Tensor,
+    z_loss_coeff: float = 0.0,
+    chunk_tokens: int = 4096,
+    ignore_index: int = IGNORE_INDEX,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Like ``chunked_ce`` but also returns the (non-differentiable) mean CE and mean logsumexp^2
+    as by-products of the same pass, so logging them costs nothing extra."""
     return _ChunkedCE.apply(hidden, weight, targets, z_loss_coeff, chunk_tokens, ignore_index)

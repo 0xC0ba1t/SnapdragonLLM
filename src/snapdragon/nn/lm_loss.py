@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import torch
 
-from snapdragon.nn.functional.ce import IGNORE_INDEX, chunked_ce
+from snapdragon.nn.functional.ce import IGNORE_INDEX, chunked_ce_with_stats
 
 
 @dataclass
@@ -23,13 +23,8 @@ def lm_loss(
     chunk_tokens: int = 4096,
     ignore_index: int = IGNORE_INDEX,
 ) -> LossOutput:
-    """hidden (B, T, d), targets (B, T). The CE/z split for logging comes from two cheap
-    no-grad passes only when needed, so the training path stays a single fused call."""
+    """hidden (B, T, d), targets (B, T). One fused pass yields the loss and its logging breakdown."""
     h = hidden.reshape(-1, hidden.shape[-1])
     t = targets.reshape(-1)
-    loss = chunked_ce(h, weight, t, z_loss_coeff, chunk_tokens, ignore_index)
-    with torch.no_grad():
-        total_with_z = loss.detach()
-        ce_only = chunked_ce(h.detach(), weight.detach(), t, 0.0, chunk_tokens, ignore_index)
-        z = (total_with_z - ce_only) / z_loss_coeff if z_loss_coeff else torch.zeros_like(ce_only)
-    return LossOutput(loss=loss, ce=ce_only, z=z)
+    loss, ce, z = chunked_ce_with_stats(h, weight, t, z_loss_coeff, chunk_tokens, ignore_index)
+    return LossOutput(loss=loss, ce=ce, z=z)

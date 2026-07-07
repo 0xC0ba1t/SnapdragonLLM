@@ -96,3 +96,16 @@ def test_only_the_lse_vector_is_saved_not_the_logits():
     with torch.autograd.graph.saved_tensors_hooks(pack, lambda x: x):
         chunked_ce(h, w, t, 1e-4, chunk_tokens=16)
     assert max(saved) < 64 * 200  # nothing as large as the (N, V) logits is retained
+
+
+def test_stats_are_by_products_of_the_same_pass():
+    from snapdragon.nn.functional.ce import chunked_ce_with_stats
+
+    h, w, t = _data(ignore=3)
+    loss, ce, z = chunked_ce_with_stats(h, w, t, 1e-2, chunk_tokens=9)
+    assert torch.allclose(ce, reference_ce(h, w, t, 0.0), atol=1e-10)
+    assert torch.allclose(ce + 1e-2 * z, loss, atol=1e-10)
+    assert not ce.requires_grad
+    assert not z.requires_grad
+    loss.backward()
+    assert h.grad is not None
