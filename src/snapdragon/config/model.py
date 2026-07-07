@@ -4,6 +4,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 ACT_CKPT_MODES = ("none", "selective", "full")
+
+
+def suggest_mlp_hidden(d_model: int, ratio: float = 8 / 3, multiple: int = 128) -> int:
+    """SwiGLU hidden size: ~ratio * d_model (8/3 keeps params equal to a 4x GELU MLP), rounded up
+    to a multiple of ``multiple`` so matmul dimensions stay tensor-core friendly."""
+    raw = ratio * d_model
+    return int(-(-raw // multiple) * multiple)
 ATTN_IMPLS = ("sdpa", "flex")
 
 

@@ -31,3 +31,12 @@ def test_untied_embeddings_add_params():
 def test_validation_errors(kwargs, match):
     with pytest.raises(ValueError, match=match):
         ModelConfig(**kwargs)
+
+
+def test_suggest_mlp_hidden_rounds_up_to_multiple():
+    from snapdragon.config.model import suggest_mlp_hidden
+
+    assert suggest_mlp_hidden(1280) == 3456  # the 500M preset: 8/3 * 1280 = 3413.3 -> 27 * 128
+    assert suggest_mlp_hidden(768) == 2048
+    assert suggest_mlp_hidden(64, multiple=64) == 192
+    assert suggest_mlp_hidden(1280) % 128 == 0
