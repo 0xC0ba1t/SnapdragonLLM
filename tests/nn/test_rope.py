@@ -65,3 +65,14 @@ def test_bf16_in_bf16_out():
     q = torch.randn(1, 2, 8, 16).bfloat16()
     rq, rk = rope(q, q)
     assert rq.dtype == rk.dtype == torch.bfloat16
+
+
+def test_rebuild_restores_tables_after_to_empty():
+    ref = RotaryEmbedding(16, 32)
+    with torch.device("meta"):
+        meta = RotaryEmbedding(16, 32)
+    assert meta.cos.device.type == "meta"
+    meta.to_empty(device="cpu")
+    meta.rebuild("cpu")
+    assert torch.equal(meta.cos, ref.cos)
+    assert torch.equal(meta.sin, ref.sin)

@@ -22,10 +22,19 @@ def apply_rotary(x: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> torch
 class RotaryEmbedding(nn.Module):
     def __init__(self, head_dim: int, max_seq_len: int, theta: float = 500_000.0) -> None:
         super().__init__()
+        self.head_dim, self.max_seq_len, self.theta = head_dim, max_seq_len, theta
         cos, sin = rope_tables(head_dim, max_seq_len, theta)
         # not persistent: cheap to rebuild, and keeps checkpoints independent of max_seq_len/theta
         self.register_buffer("cos", cos, persistent=False)
         self.register_buffer("sin", sin, persistent=False)
+
+    def rebuild(self, device: torch.device | str | None = None) -> None:
+        """Recompute the tables in place. Needed after ``to_empty`` (meta -> real), which leaves
+        buffers uninitialised."""
+        cos, sin = rope_tables(self.head_dim, self.max_seq_len, self.theta)
+        device = device or self.cos.device
+        self.cos = cos.to(device)
+        self.sin = sin.to(device)
 
     def forward(
         self, q: torch.Tensor, k: torch.Tensor, position_ids: torch.Tensor | None = None
