@@ -29,6 +29,7 @@ class ModelConfig:
     qk_norm: bool = True
     tie_embeddings: bool = True
     init_std: float = 0.02
+    init_seed: int = 1337  # init uses its own generator, so it never depends on global RNG state
     attn_impl: str = "sdpa"
     act_ckpt: str = "none"
     act_ckpt_every: int = 1  # for "selective": checkpoint every k-th block

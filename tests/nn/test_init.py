@@ -33,3 +33,15 @@ def test_embedding_and_norm_defaults():
     block = Block(cfg)
     init_weights(block, cfg)
     assert torch.equal(block.attn_norm.weight, torch.ones(256))
+
+
+def test_init_ignores_global_rng_and_is_seeded_by_config():
+    cfg = _cfg()
+    a, b, c = Block(cfg), Block(cfg), Block(_cfg(init_seed=5))
+    torch.manual_seed(1)
+    init_weights(a, cfg)
+    torch.manual_seed(999)
+    init_weights(b, cfg)
+    init_weights(c, _cfg(init_seed=5))
+    assert torch.equal(a.attn.qkv_proj.weight, b.attn.qkv_proj.weight)
+    assert not torch.equal(a.attn.qkv_proj.weight, c.attn.qkv_proj.weight)

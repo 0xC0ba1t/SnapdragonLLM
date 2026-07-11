@@ -30,6 +30,7 @@ class Transformer(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
+        """(Re)initialise every weight. Rotary tables are buffers, handled by ``rope.rebuild``."""
         init_weights(self, self.cfg)
 
     @property
