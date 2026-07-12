@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import torch
 from torch import nn
+from torch.utils.checkpoint import checkpoint
 
 from snapdragon.config.model import ModelConfig
 from snapdragon.nn.block import Block
@@ -44,9 +45,22 @@ class Transformer(nn.Module):
         if tokens.shape[1] > self.cfg.max_seq_len:
             raise ValueError(f"sequence length {tokens.shape[1]} exceeds max_seq_len {self.cfg.max_seq_len}")
         x = self.embed(tokens)
-        for block in self.blocks:
-            x = block(x, self.rope, position_ids, attn_mask)
+        for i, block in enumerate(self.blocks):
+            if self.training and self._checkpoint_block(i):
+                x = checkpoint(block, x, self.rope, position_ids, attn_mask, use_reentrant=False)
+            else:
+                x = block(x, self.rope, position_ids, attn_mask)
         return self.final_norm(x)
+
+    def _checkpoint_block(self, i: int) -> bool:
+        """Activation checkpointing trades compute for memory: a checkpointed block keeps only its
+        input and redoes its forward during backward. "selective" does this for every k-th block."""
+        mode = self.cfg.act_ckpt
+        if mode == "full":
+            return True
+        if mode == "selective":
+            return i % self.cfg.act_ckpt_every == 0
+        return False
 
     def logits(self, hidden: torch.Tensor) -> torch.Tensor:
         """Full logits for a (small) hidden tensor, e.g. the last position during generation."""
