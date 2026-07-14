@@ -1,15 +1,40 @@
 """The decoder-only transformer."""
 from __future__ import annotations
 
+import functools
+
 import torch
 from torch import nn
-from torch.utils.checkpoint import checkpoint
+from torch.utils.checkpoint import (
+    CheckpointPolicy,
+    checkpoint,
+    create_selective_checkpoint_contexts,
+)
 
 from snapdragon.config.model import ModelConfig
 from snapdragon.nn.block import Block
 from snapdragon.nn.init import init_weights
 from snapdragon.nn.norm import RMSNorm
 from snapdragon.nn.rope import RotaryEmbedding
+
+
+def _save_ops() -> set:
+    """Expensive ops whose outputs SAC keeps instead of recomputing (matmuls and attention kernels)."""
+    aten = torch.ops.aten
+    names = ["mm", "addmm", "bmm", "_scaled_dot_product_flash_attention",
+             "_scaled_dot_product_efficient_attention", "_scaled_dot_product_cudnn_attention",
+             "_scaled_dot_product_flash_attention_for_cpu"]
+    return {getattr(aten, n).default for n in names if hasattr(aten, n)}
+
+
+_SAVE = _save_ops()
+
+
+def _sac_policy(ctx, op, *args, **kwargs):
+    return CheckpointPolicy.MUST_SAVE if op in _SAVE else CheckpointPolicy.PREFER_RECOMPUTE
+
+
+_SAC_CONTEXT = functools.partial(create_selective_checkpoint_contexts, _sac_policy)
 
 
 class Transformer(nn.Module):
@@ -46,7 +71,11 @@ class Transformer(nn.Module):
             raise ValueError(f"sequence length {tokens.shape[1]} exceeds max_seq_len {self.cfg.max_seq_len}")
         x = self.embed(tokens)
         for i, block in enumerate(self.blocks):
-            if self.training and self._checkpoint_block(i):
+            if self.training and self.cfg.act_ckpt == "sac":
+                # keep matmul/attention outputs, recompute only the cheap pointwise ops
+                x = checkpoint(block, x, self.rope, position_ids, attn_mask,
+                               use_reentrant=False, context_fn=_SAC_CONTEXT)
+            elif self.training and self._checkpoint_block(i):
                 x = checkpoint(block, x, self.rope, position_ids, attn_mask, use_reentrant=False)
             else:
                 x = block(x, self.rope, position_ids, attn_mask)

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-ACT_CKPT_MODES = ("none", "selective", "full")
+ACT_CKPT_MODES = ("none", "selective", "sac", "full")
 
 
 def suggest_mlp_hidden(d_model: int, ratio: float = 8 / 3, multiple: int = 128) -> int:
