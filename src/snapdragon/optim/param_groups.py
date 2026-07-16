@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import torch
 from torch import nn
 
 
@@ -49,10 +48,3 @@ def assert_partition(model: nn.Module, split: ParamSplit) -> None:
     expected = {id(p) for p in model.parameters() if p.requires_grad}
     if len(owned) != len(set(owned)) or set(owned) != expected:
         raise AssertionError("parameter groups do not partition the trainable parameters")
-
-
-def numel_by_group(split: ParamSplit) -> dict[str, int]:
-    return split.counts()
-
-
-__all__ = ["ParamSplit", "assert_partition", "numel_by_group", "split_params", "torch"]
