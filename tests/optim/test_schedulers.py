@@ -56,3 +56,36 @@ def test_cosine_midpoint():
 def test_no_warmup():
     c = SchedulerConfig(kind="linear", warmup_steps=0, min_lr_ratio=0.0)
     assert lr_multiplier(c, 0, 100) == pytest.approx(1.0)
+
+
+def test_schedule_scales_groups_and_keeps_their_ratio():
+    import torch
+
+    from snapdragon.optim.schedulers import LRSchedule
+
+    a, b = torch.nn.Parameter(torch.zeros(1)), torch.nn.Parameter(torch.zeros(1))
+    opt = torch.optim.SGD([{"params": [a], "lr": 0.02}, {"params": [b], "lr": 0.002}])
+    sched = LRSchedule(opt, cfg("cosine"), N)
+    assert opt.param_groups[0]["lr"] == pytest.approx(0.02 * 0.01)  # warmup step 0
+    for _ in range(300):
+        sched.step()
+    g0, g1 = (g["lr"] for g in opt.param_groups)
+    assert g0 / g1 == pytest.approx(10.0)
+    assert g0 < 0.02
+
+
+def test_schedule_state_roundtrip():
+    import torch
+
+    from snapdragon.optim.schedulers import LRSchedule
+
+    p = torch.nn.Parameter(torch.zeros(1))
+    opt = torch.optim.SGD([p], lr=1.0)
+    s1 = LRSchedule(opt, cfg("wsd"), N)
+    for _ in range(850):
+        s1.step()
+    lr = opt.param_groups[0]["lr"]
+    opt2 = torch.optim.SGD([torch.nn.Parameter(torch.zeros(1))], lr=1.0)
+    s2 = LRSchedule(opt2, cfg("wsd"), N)
+    s2.load_state_dict(s1.state_dict())
+    assert opt2.param_groups[0]["lr"] == pytest.approx(lr)
