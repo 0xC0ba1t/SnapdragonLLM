@@ -66,3 +66,34 @@ def test_storage_is_about_one_byte_per_value():
     codes, absmax = quantize_blockwise(x, linear_codebook(True))
     nbytes = codes.numel() * codes.element_size() + absmax.numel() * absmax.element_size()
     assert nbytes < 1.01 * x.numel()
+
+
+def _rel_error_on_small_values(cb):
+    torch.manual_seed(0)
+    x = torch.randn(1 << 15) * torch.exp(torch.randn(1 << 15) * 1.5)  # heavy tailed
+    codes, absmax = quantize_blockwise(x, cb, block=2048)
+    y = dequantize_blockwise(codes, absmax, cb, x.shape, block=2048)
+    small = x.abs() < x.abs().median()
+    return ((x - y).abs()[small] / x.abs()[small]).median().item()
+
+
+def test_power_codebook_shape_and_ends():
+    from snapdragon.optim.quant import power_codebook
+
+    cb = power_codebook(True, 3.0)
+    assert cb.numel() == 256
+    assert cb.min() == -1
+    assert cb.max() == 1
+    assert (cb == 0).any()
+    assert torch.all(cb[1:] >= cb[:-1])
+    u = power_codebook(False, 4.0)
+    assert u.min() == 0
+    assert u.max() == 1
+
+
+def test_power_codebook_resolves_small_values_better_than_linear():
+    from snapdragon.optim.quant import power_codebook
+
+    lin = _rel_error_on_small_values(linear_codebook(True))
+    pw = _rel_error_on_small_values(power_codebook(True, 3.0))
+    assert pw < 0.5 * lin

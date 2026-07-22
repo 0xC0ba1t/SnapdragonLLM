@@ -19,6 +19,16 @@ def linear_codebook(signed: bool = True) -> torch.Tensor:
     return torch.linspace(0.0, 1.0, 256)
 
 
+def power_codebook(signed: bool = True, power: float = 3.0) -> torch.Tensor:
+    """Codebook that is dense near zero: sign(t) * |t|**power over the linear grid.
+
+    Optimizer state is heavy-tailed (a few large entries, many tiny ones). A linear grid wastes
+    most codes on large values; a power grid spends them where the values actually live.
+    """
+    t = linear_codebook(signed)
+    return torch.sign(t) * t.abs().pow(power)
+
+
 def _midpoints(codebook: torch.Tensor) -> torch.Tensor:
     return (codebook[1:] + codebook[:-1]) / 2
 
