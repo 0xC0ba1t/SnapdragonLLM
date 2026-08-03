@@ -71,3 +71,29 @@ def test_zero_gradient_keeps_state_finite():
 def test_bad_lr():
     with pytest.raises(ValueError, match="lr"):
         AdamW8bit([torch.nn.Parameter(torch.zeros(3))], lr=0)
+
+
+def test_state_dict_roundtrip_continues_identically(tmp_path):
+    def build():
+        w, target, scale = _problem(n=10_000)
+        return w, target, scale, AdamW8bit([w], lr=0.02, weight_decay=0.1)
+
+    def advance(w, target, scale, opt, n):
+        for _ in range(n):
+            opt.zero_grad()
+            (0.5 * scale * (w - target) ** 2).mean().backward()
+            opt.step()
+
+    w1, t, s, o1 = build()
+    advance(w1, t, s, o1, 20)
+    torch.save({"w": w1.detach(), "opt": o1.state_dict()}, tmp_path / "ck.pt")
+
+    w2, _, _, o2 = build()
+    ck = torch.load(tmp_path / "ck.pt")
+    w2.data.copy_(ck["w"])
+    o2.load_state_dict(ck["opt"])
+    assert o2.state[w2]["m_codes"].dtype == torch.uint8
+
+    advance(w1, t, s, o1, 10)
+    advance(w2, t, s, o2, 10)
+    assert torch.equal(w1, w2)  # bitwise identical, quantized state included

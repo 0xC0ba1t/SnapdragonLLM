@@ -94,3 +94,16 @@ class AdamW8bit(torch.optim.Optimizer):
                 else:
                     state["exp_avg"], state["exp_avg_sq"] = m, v
         return loss
+
+    def load_state_dict(self, state_dict: dict) -> None:
+        super().load_state_dict(state_dict)
+        # torch casts every state tensor to the parameter dtype on load; put the int8 codes and the
+        # fp32 scales back, otherwise a resumed run holds 4x the intended optimizer memory
+        for group in self.param_groups:
+            for p in group["params"]:
+                st = self.state.get(p)
+                if st and "m_codes" in st:
+                    for key in ("m_codes", "v_codes"):
+                        st[key] = st[key].to(torch.uint8)
+                    for key in ("m_absmax", "v_absmax"):
+                        st[key] = st[key].to(torch.float32)
