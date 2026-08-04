@@ -41,6 +41,17 @@ def test_zero_matrix_stays_finite():
     assert torch.isfinite(out.float()).all()
 
 
-def test_requires_a_matrix():
+def test_requires_a_matrix_or_stack():
     with pytest.raises(ValueError, match="expects a matrix"):
         newton_schulz(torch.randn(4))
+    with pytest.raises(ValueError, match="expects a matrix"):
+        newton_schulz(torch.randn(2, 2, 2, 2))
+
+
+@pytest.mark.parametrize("shape", [(5, 16, 32), (3, 40, 12)])
+def test_stack_equals_one_by_one(shape):
+    torch.manual_seed(3)
+    stack = torch.randn(*shape)
+    batched = newton_schulz(stack).float()
+    for i in range(shape[0]):
+        assert torch.allclose(batched[i], newton_schulz(stack[i]).float(), atol=2e-2)
