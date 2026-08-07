@@ -48,13 +48,14 @@ class Muon(torch.optim.Optimizer):
         nesterov: bool = True,
         ns_steps: int = 5,
         buffer_dtype: torch.dtype = torch.bfloat16,
+        ns_batch_size: int = 4,
     ) -> None:
         if lr <= 0:
             raise ValueError("lr must be positive")
         if not 0.0 <= momentum < 1.0:
             raise ValueError("momentum must be in [0, 1)")
         defaults = dict(lr=lr, momentum=momentum, weight_decay=weight_decay, nesterov=nesterov,
-                        ns_steps=ns_steps, buffer_dtype=buffer_dtype)
+                        ns_steps=ns_steps, buffer_dtype=buffer_dtype, ns_batch_size=ns_batch_size)
         super().__init__(params, defaults)
         for group in self.param_groups:
             for p in group["params"]:
@@ -69,6 +70,8 @@ class Muon(torch.optim.Optimizer):
                 loss = closure()
         for group in self.param_groups:
             lr, mom = group["lr"], group["momentum"]
+            # 1) momentum update for every parameter, remembering the direction to orthogonalise
+            pending: dict[tuple, list[tuple[torch.nn.Parameter, torch.Tensor]]] = {}
             for p in group["params"]:
                 if p.grad is None:
                     continue
@@ -79,12 +82,18 @@ class Muon(torch.optim.Optimizer):
                 buf = state["momentum_buffer"]
                 buf.lerp_(g.to(buf.dtype), 1 - mom)  # buf = mom * buf + (1 - mom) * g
                 update = g.lerp(buf.to(g.dtype), mom) if group["nesterov"] else buf.to(g.dtype)
-                update = newton_schulz(update, group["ns_steps"])
-                rows, cols = p.shape
-                update = update * max(1.0, rows / cols) ** 0.5  # tall matrices get proportionally larger steps
-                if group["weight_decay"]:
-                    p.mul_(1 - lr * group["weight_decay"])
-                p.add_(update.to(p.dtype), alpha=-lr)
+                pending.setdefault((tuple(p.shape), p.device), []).append((p, update))
+            # 2) orthogonalise same-shaped matrices together in small batches (one bmm per NS step)
+            for (shape, _), items in pending.items():
+                rows, cols = shape
+                scale = max(1.0, rows / cols) ** 0.5  # tall matrices get proportionally larger steps
+                for i in range(0, len(items), group["ns_batch_size"]):
+                    chunk = items[i : i + group["ns_batch_size"]]
+                    ortho = newton_schulz(torch.stack([u for _, u in chunk]), group["ns_steps"])
+                    for (p, _), o in zip(chunk, ortho):
+                        if group["weight_decay"]:
+                            p.mul_(1 - lr * group["weight_decay"])
+                        p.add_((o * scale).to(p.dtype), alpha=-lr)
         return loss
 
     def load_state_dict(self, state_dict: dict) -> None:

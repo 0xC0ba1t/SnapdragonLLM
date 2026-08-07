@@ -87,3 +87,30 @@ def test_resume_keeps_buffers_in_bf16():
     fresh = Muon([w])
     fresh.load_state_dict(opt.state_dict())
     assert fresh.state[w]["momentum_buffer"].dtype == torch.bfloat16
+
+
+def test_batched_step_matches_one_matrix_at_a_time():
+    torch.manual_seed(5)
+    shapes = [(16, 32), (16, 32), (16, 32), (24, 24), (40, 16)]
+    base = [torch.randn(*s) * 0.1 for s in shapes]
+    grads = [torch.randn(*s) for s in shapes]
+
+    def run(batch):
+        ps = [torch.nn.Parameter(b.clone()) for b in base]
+        for p, g in zip(ps, grads):
+            p.grad = g.clone()
+        Muon(ps, lr=0.05, ns_batch_size=batch).step()
+        return ps
+
+    one, many = run(1), run(4)
+    for a, b in zip(one, many):
+        assert torch.allclose(a, b, atol=5e-3)
+
+
+def test_missing_gradients_are_skipped():
+    a = torch.nn.Parameter(torch.ones(4, 4))
+    b = torch.nn.Parameter(torch.ones(4, 4))
+    a.grad = torch.randn(4, 4)
+    Muon([a, b], lr=0.1).step()
+    assert torch.equal(b, torch.ones(4, 4))
+    assert not torch.equal(a, torch.ones(4, 4))
