@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-PRECISIONS = ("bf16", "fp16", "fp32")
+# fp16 would need a GradScaler, which the custom Muon/8-bit optimizers do not support
+PRECISIONS = ("bf16", "fp32")
 
 
 @dataclass

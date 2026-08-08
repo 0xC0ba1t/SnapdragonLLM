@@ -28,3 +28,8 @@ def test_bad_precision():
 def test_seq_len_warmup_bounds():
     with pytest.raises(ValueError, match="seq_len_start"):
         TrainConfig(seq_len_warmup_tokens=100, seq_len_start=4096, seq_len=2048)
+
+
+def test_fp16_training_is_not_offered():
+    with pytest.raises(ValueError, match="precision"):
+        TrainConfig(precision="fp16")
