@@ -114,3 +114,31 @@ def test_missing_gradients_are_skipped():
     Muon([a, b], lr=0.1).step()
     assert torch.equal(b, torch.ones(4, 4))
     assert not torch.equal(a, torch.ones(4, 4))
+
+
+def test_offloaded_state_lives_on_the_state_device_and_gives_same_result():
+    base = torch.randn(8, 8)
+    grad = torch.randn(8, 8)
+
+    def run(**kw):
+        p = torch.nn.Parameter(base.clone())
+        opt = Muon([p], lr=0.05, **kw)
+        for _ in range(3):
+            p.grad = grad.clone()
+            opt.step()
+        return p, opt
+
+    plain, _ = run()
+    off, opt = run(state_device="cpu")
+    assert opt.state[off]["momentum_buffer"].device.type == "cpu"
+    assert torch.allclose(plain, off, atol=1e-6)
+
+
+@pytest.mark.gpu
+def test_offloaded_buffers_stay_on_host_while_params_train_on_gpu():
+    p = torch.nn.Parameter(torch.randn(16, 16, device="cuda"))
+    opt = Muon([p], lr=0.05, state_device="cpu")
+    p.grad = torch.randn_like(p)
+    opt.step()
+    assert opt.state[p]["momentum_buffer"].device.type == "cpu"
+    assert p.device.type == "cuda"

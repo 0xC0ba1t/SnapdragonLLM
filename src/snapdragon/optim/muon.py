@@ -49,13 +49,15 @@ class Muon(torch.optim.Optimizer):
         ns_steps: int = 5,
         buffer_dtype: torch.dtype = torch.bfloat16,
         ns_batch_size: int = 4,
+        state_device: torch.device | str | None = None,
     ) -> None:
         if lr <= 0:
             raise ValueError("lr must be positive")
         if not 0.0 <= momentum < 1.0:
             raise ValueError("momentum must be in [0, 1)")
         defaults = dict(lr=lr, momentum=momentum, weight_decay=weight_decay, nesterov=nesterov,
-                        ns_steps=ns_steps, buffer_dtype=buffer_dtype, ns_batch_size=ns_batch_size)
+                        ns_steps=ns_steps, buffer_dtype=buffer_dtype, ns_batch_size=ns_batch_size,
+                        state_device=torch.device(state_device) if state_device else None)
         super().__init__(params, defaults)
         for group in self.param_groups:
             for p in group["params"]:
@@ -78,9 +80,14 @@ class Muon(torch.optim.Optimizer):
                 g = p.grad
                 state = self.state[p]
                 if "momentum_buffer" not in state:
-                    state["momentum_buffer"] = torch.zeros_like(p, dtype=group["buffer_dtype"])
-                buf = state["momentum_buffer"]
+                    state["momentum_buffer"] = torch.zeros_like(
+                        p, dtype=group["buffer_dtype"], device=group["state_device"] or p.device
+                    )
+                stored = state["momentum_buffer"]
+                buf = stored.to(p.device, non_blocking=True) if stored.device != p.device else stored
                 buf.lerp_(g.to(buf.dtype), 1 - mom)  # buf = mom * buf + (1 - mom) * g
+                if buf is not stored:
+                    stored.copy_(buf, non_blocking=True)  # offloaded state goes back to host memory
                 update = g.lerp(buf.to(g.dtype), mom) if group["nesterov"] else buf.to(g.dtype)
                 pending.setdefault((tuple(p.shape), p.device), []).append((p, update))
             # 2) orthogonalise same-shaped matrices together in small batches (one bmm per NS step)
@@ -104,4 +111,6 @@ class Muon(torch.optim.Optimizer):
             for p in group["params"]:
                 st = self.state.get(p)
                 if st and "momentum_buffer" in st:
-                    st["momentum_buffer"] = st["momentum_buffer"].to(group["buffer_dtype"])
+                    st["momentum_buffer"] = st["momentum_buffer"].to(
+                        dtype=group["buffer_dtype"], device=group["state_device"] or p.device
+                    )
