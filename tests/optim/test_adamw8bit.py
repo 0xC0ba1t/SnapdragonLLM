@@ -97,3 +97,19 @@ def test_state_dict_roundtrip_continues_identically(tmp_path):
     advance(w1, t, s, o1, 10)
     advance(w2, t, s, o2, 10)
     assert torch.equal(w1, w2)  # bitwise identical, quantized state included
+
+
+def test_offloaded_state_matches_resident_state():
+    def run(**kw):
+        w = torch.nn.Parameter(torch.zeros(8192))
+        opt = AdamW8bit([w], lr=0.02, **kw)
+        g = torch.Generator().manual_seed(0)
+        for _ in range(5):
+            w.grad = torch.randn(8192, generator=g)
+            opt.step()
+        return w.detach(), opt, w
+
+    a, _, _ = run()
+    b, opt, wb = run(state_device="cpu")
+    assert torch.equal(a, b)
+    assert opt.state[wb]["m_codes"].device.type == "cpu"

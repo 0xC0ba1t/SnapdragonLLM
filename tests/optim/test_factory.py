@@ -53,3 +53,9 @@ def test_untied_model_gets_its_head_in_adam():
     opt = build_optimizer(m, OptimConfig())
     adam_params = {id(p) for g in opt.optimizers["adam"].param_groups for p in g["params"]}
     assert id(m.transformer.lm_head.weight) in adam_params
+
+
+def test_offload_flag_routes_state_to_host():
+    opt = build_optimizer(build_model(CFG), OptimConfig(offload_states=True))
+    assert opt.optimizers["muon"].param_groups[0]["state_device"] == torch.device("cpu")
+    assert opt.optimizers["adam"].param_groups[0]["state_device"] == torch.device("cpu")

@@ -28,29 +28,32 @@ class AdamW8bit(torch.optim.Optimizer):
         weight_decay: float = 0.1,
         block: int = DEFAULT_BLOCK,
         min_8bit_size: int = 4096,
+        state_device: torch.device | str | None = None,
     ) -> None:
         if lr <= 0:
             raise ValueError("lr must be positive")
         defaults = dict(lr=lr, betas=betas, eps=eps, weight_decay=weight_decay,
-                        block=block, min_8bit_size=min_8bit_size)
+                        block=block, min_8bit_size=min_8bit_size,
+                        state_device=torch.device(state_device) if state_device else None)
         super().__init__(params, defaults)
         self.m_codebook = power_codebook(True, 3.0)
         self.sqrt_v_codebook = power_codebook(False, 2.0)
 
     def _init_state(self, p: torch.Tensor, group: dict) -> dict:
         state = {"step": 0}
+        dev = group["state_device"] or p.device
         if p.numel() >= group["min_8bit_size"]:
             n_blocks = -(-p.numel() // group["block"])
-            zeros8 = torch.zeros(p.numel(), dtype=torch.uint8, device=p.device)
+            zeros8 = torch.zeros(p.numel(), dtype=torch.uint8, device=dev)
             state.update(
                 m_codes=zeros8.clone() + self._zero_code(self.m_codebook),
-                m_absmax=torch.zeros(n_blocks, device=p.device),
+                m_absmax=torch.zeros(n_blocks, device=dev),
                 v_codes=zeros8,
-                v_absmax=torch.zeros(n_blocks, device=p.device),
+                v_absmax=torch.zeros(n_blocks, device=dev),
             )
         else:
-            state.update(exp_avg=torch.zeros_like(p, dtype=torch.float32),
-                         exp_avg_sq=torch.zeros_like(p, dtype=torch.float32))
+            state.update(exp_avg=torch.zeros_like(p, dtype=torch.float32, device=dev),
+                         exp_avg_sq=torch.zeros_like(p, dtype=torch.float32, device=dev))
         return state
 
     @staticmethod
@@ -74,12 +77,14 @@ class AdamW8bit(torch.optim.Optimizer):
                     state.update(self._init_state(p, group))
                 state["step"] += 1
                 quantized = "m_codes" in state
+                home = group["state_device"] or p.device  # where state is stored between steps
                 if quantized:
-                    m = dequantize_blockwise(state["m_codes"], state["m_absmax"], self.m_codebook, p.shape, block)
-                    sqrt_v = dequantize_blockwise(state["v_codes"], state["v_absmax"], self.sqrt_v_codebook, p.shape, block)
+                    mc, ma, vc, va = (state[k].to(p.device) for k in ("m_codes", "m_absmax", "v_codes", "v_absmax"))
+                    m = dequantize_blockwise(mc, ma, self.m_codebook, p.shape, block)
+                    sqrt_v = dequantize_blockwise(vc, va, self.sqrt_v_codebook, p.shape, block)
                     v = sqrt_v.square()
                 else:
-                    m, v = state["exp_avg"], state["exp_avg_sq"]
+                    m, v = state["exp_avg"].to(p.device), state["exp_avg_sq"].to(p.device)
                 m = m.mul(b1).add_(g, alpha=1 - b1)
                 v = v.mul(b2).addcmul_(g, g, value=1 - b2)
                 bc1 = 1 - b1 ** state["step"]
@@ -89,10 +94,13 @@ class AdamW8bit(torch.optim.Optimizer):
                     p.mul_(1 - lr * wd)
                 p.addcdiv_((m / bc1).to(p.dtype), denom.to(p.dtype), value=-lr)
                 if quantized:
-                    state["m_codes"], state["m_absmax"] = quantize_blockwise(m, self.m_codebook, block)
-                    state["v_codes"], state["v_absmax"] = quantize_blockwise(v.sqrt(), self.sqrt_v_codebook, block)
+                    for name, new in zip(("m_codes", "m_absmax"), quantize_blockwise(m, self.m_codebook, block)):
+                        state[name] = new.to(home)
+                    for name, new in zip(("v_codes", "v_absmax"),
+                                         quantize_blockwise(v.sqrt(), self.sqrt_v_codebook, block)):
+                        state[name] = new.to(home)
                 else:
-                    state["exp_avg"], state["exp_avg_sq"] = m, v
+                    state["exp_avg"], state["exp_avg_sq"] = m.to(home), v.to(home)
         return loss
 
     def load_state_dict(self, state_dict: dict) -> None:
@@ -103,7 +111,8 @@ class AdamW8bit(torch.optim.Optimizer):
             for p in group["params"]:
                 st = self.state.get(p)
                 if st and "m_codes" in st:
+                    dev = group["state_device"] or p.device
                     for key in ("m_codes", "v_codes"):
-                        st[key] = st[key].to(torch.uint8)
+                        st[key] = st[key].to(device=dev, dtype=torch.uint8)
                     for key in ("m_absmax", "v_absmax"):
-                        st[key] = st[key].to(torch.float32)
+                        st[key] = st[key].to(device=dev, dtype=torch.float32)
