@@ -55,3 +55,29 @@ def list_checkpoints(root: str | Path) -> list[tuple[int, Path]]:
         if m and p.is_dir() and (p / COMPLETE).exists():
             found.append((int(m.group(1)), p))
     return sorted(found)
+
+
+def latest_checkpoint(root: str | Path) -> Path | None:
+    found = list_checkpoints(root)
+    return found[-1][1] if found else None
+
+
+def load_checkpoint(path: str | Path, map_location: str | torch.device = "cpu") -> dict[str, Any]:
+    """Load every ``<name>.pt`` component of a checkpoint directory."""
+    path = Path(path)
+    if not (path / COMPLETE).exists():
+        raise FileNotFoundError(f"{path} is not a complete checkpoint (missing {COMPLETE} marker)")
+    return {
+        f.stem: torch.load(f, map_location=map_location, weights_only=False)
+        for f in sorted(path.glob("*.pt"))
+    }
+
+
+def prune_checkpoints(root: str | Path, keep_last_n: int) -> list[Path]:
+    """Delete all but the newest ``keep_last_n`` complete checkpoints; returns what was removed."""
+    if keep_last_n < 1:
+        raise ValueError("keep_last_n must be at least 1")
+    doomed = [p for _, p in list_checkpoints(root)[:-keep_last_n]]
+    for p in doomed:
+        shutil.rmtree(p)
+    return doomed

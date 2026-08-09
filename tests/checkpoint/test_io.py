@@ -45,3 +45,41 @@ def test_failed_save_leaves_nothing_visible(tmp_path):
         save_checkpoint(tmp_path, 7, {"ok": 1, "bad": Unpicklable()})
     assert list_checkpoints(tmp_path) == []
     assert list(tmp_path.iterdir()) == []
+
+
+def test_latest_and_load_roundtrip(tmp_path):
+    from snapdragon.checkpoint.io import latest_checkpoint, load_checkpoint
+
+    assert latest_checkpoint(tmp_path) is None
+    save_checkpoint(tmp_path, 10, {"a": torch.tensor([1.0])})
+    save_checkpoint(tmp_path, 20, {"a": torch.tensor([2.0]), "b": {"k": "v"}})
+    latest = latest_checkpoint(tmp_path)
+    assert latest.name == "step_00000020"
+    loaded = load_checkpoint(latest)
+    assert set(loaded) == {"a", "b"}
+    assert loaded["b"] == {"k": "v"}
+
+
+def test_load_refuses_incomplete_directories(tmp_path):
+    from snapdragon.checkpoint.io import load_checkpoint
+
+    (tmp_path / "step_00000001").mkdir()
+    with pytest.raises(FileNotFoundError, match="not a complete checkpoint"):
+        load_checkpoint(tmp_path / "step_00000001")
+
+
+def test_prune_keeps_newest(tmp_path):
+    from snapdragon.checkpoint.io import prune_checkpoints
+
+    for s in (1, 2, 3, 4, 5):
+        save_checkpoint(tmp_path, s, {"x": s})
+    removed = prune_checkpoints(tmp_path, 2)
+    assert sorted(p.name for p in removed) == ["step_00000001", "step_00000002", "step_00000003"]
+    assert [s for s, _ in list_checkpoints(tmp_path)] == [4, 5]
+
+
+def test_prune_requires_positive_keep(tmp_path):
+    from snapdragon.checkpoint.io import prune_checkpoints
+
+    with pytest.raises(ValueError, match="at least 1"):
+        prune_checkpoints(tmp_path, 0)
