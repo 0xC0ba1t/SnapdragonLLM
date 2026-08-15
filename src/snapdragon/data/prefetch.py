@@ -27,7 +27,11 @@ class PrefetchLoader:
         self.builder = builder
         self.pin_memory = pin_memory and torch.cuda.is_available()
         self.batch_index = start_batch
-        self._queue: queue.Queue = queue.Queue(maxsize=depth)
+        self.depth = depth
+        self._start_worker(start_batch)
+
+    def _start_worker(self, start_batch: int) -> None:
+        self._queue: queue.Queue = queue.Queue(maxsize=self.depth)
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._work, args=(start_batch,), daemon=True)
         self._thread.start()
@@ -65,6 +69,12 @@ class PrefetchLoader:
 
     def state_dict(self) -> dict:
         return {"batch_index": self.batch_index}
+
+    def load_state_dict(self, state: dict) -> None:
+        """Seek: stop the worker, drop everything prefetched, restart at the saved batch."""
+        self.close()
+        self.batch_index = int(state["batch_index"])
+        self._start_worker(self.batch_index)
 
     def close(self) -> None:
         self._stop.set()

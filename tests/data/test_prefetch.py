@@ -55,3 +55,14 @@ def test_close_stops_the_thread(ds_path):
 def test_pin_memory_flag_is_safe_without_cuda(ds_path):
     with PrefetchLoader(_builder(ds_path), depth=2, pin_memory=True) as pre:
         assert next(pre).x.shape == (4, 16)
+
+
+def test_load_state_dict_seeks_and_discards_prefetched_batches(ds_path):
+    expected = _builder(ds_path).get_batch(5)[0]
+    with PrefetchLoader(_builder(ds_path), depth=3) as pre:
+        for _ in range(2):
+            next(pre)
+        pre.load_state_dict({"batch_index": 5})
+        assert pre.batch_index == 5
+        assert torch.equal(next(pre).x, expected)
+        assert pre.state_dict() == {"batch_index": 6}
