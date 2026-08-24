@@ -12,6 +12,7 @@ from snapdragon.config.schema import Config
 from snapdragon.model.compile import unwrap_model
 from snapdragon.optim.clip import clip_grad_norm
 from snapdragon.train.callbacks.base import Callback, CallbackList
+from snapdragon.train.curriculum import seq_len_at
 from snapdragon.train.precision import autocast_context
 from snapdragon.train.state import TrainState
 
@@ -68,8 +69,9 @@ class Trainer:
         self.optimizer.zero_grad(set_to_none=True)
         stats = torch.zeros(3, device=self.device)  # loss, ce, z averaged over micro-batches
         tokens = 0
+        seq_len = seq_len_at(self.state.tokens_seen, cfg)  # curriculum: shorter rows early on
         for micro in range(self.grad_accum_steps):
-            batch = next(self.train_loader).to(self.device)
+            batch = next(self.train_loader).to(self.device).regroup(seq_len)
             sync = contextlib.nullcontext()
             if micro < self.grad_accum_steps - 1 and hasattr(self.model, "no_sync"):
                 sync = self.model.no_sync()  # DDP: only all-reduce gradients on the last micro-batch
@@ -107,6 +109,7 @@ class Trainer:
             "grad_norm": float(norm),
             "lr": lr,
             "tokens_seen": self.state.tokens_seen,
+            "seq_len": seq_len,
             "skipped": skipped,
         }
 

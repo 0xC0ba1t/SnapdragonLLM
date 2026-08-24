@@ -53,3 +53,24 @@ def test_with_doc_info_adds_position_ids():
     b = Batch(x, x.clone()).with_doc_info(eos_id=9)
     assert b.position_ids.tolist() == [[0, 1, 2, 0, 1]]
     assert b.to("cpu", non_blocking=False).position_ids.tolist() == [[0, 1, 2, 0, 1]]
+
+
+def test_regroup_cuts_rows_without_losing_tokens():
+    from snapdragon.data.loader import Batch
+
+    x = torch.arange(16).view(2, 8)
+    b = Batch(x, x + 1, x * 10).regroup(4)
+    assert b.x.shape == (4, 4)
+    assert b.x.tolist() == [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]
+    assert (b.y - b.x).unique().tolist() == [1]  # targets stay aligned with inputs
+    assert b.position_ids[1].tolist() == [40, 50, 60, 70]
+    assert Batch(x, x).regroup(8).x is x  # no-op when already that length
+
+
+def test_regroup_requires_a_divisor():
+    import pytest
+
+    from snapdragon.data.loader import Batch
+
+    with pytest.raises(ValueError, match="must divide"):
+        Batch(torch.zeros(1, 10, dtype=torch.long), torch.zeros(1, 10, dtype=torch.long)).regroup(3)

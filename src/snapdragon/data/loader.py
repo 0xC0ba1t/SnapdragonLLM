@@ -14,6 +14,19 @@ class Batch:
     y: torch.Tensor  # (B, T) next-token targets
     position_ids: torch.Tensor | None = None  # (B, T) optional, position within each document
 
+    def regroup(self, seq_len: int) -> Batch:
+        """Cut each (B, T) row into T // seq_len shorter rows: same tokens, shorter contexts."""
+        B, T = self.x.shape
+        if seq_len == T:
+            return self
+        if T % seq_len:
+            raise ValueError(f"seq_len {seq_len} must divide the batch length {T}")
+
+        def cut(t):
+            return None if t is None else t.reshape(B * (T // seq_len), seq_len)
+
+        return Batch(cut(self.x), cut(self.y), cut(self.position_ids))
+
     def with_doc_info(self, eos_id: int) -> Batch:
         """Attach per-document position ids (restarting after each <|eos|>) for packed training."""
         from snapdragon.data.packing import position_ids_from_tokens

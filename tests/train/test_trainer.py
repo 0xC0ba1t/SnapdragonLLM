@@ -115,3 +115,17 @@ def test_loss_spike_is_skipped(make_trainer, tiny_config):
     m = t.train_step()
     assert m["skipped"] is True
     assert t.state.loss_ema == ema  # the spike must not contaminate the EMA
+
+
+def test_sequence_length_warmup_grows_while_tokens_per_step_stay_constant(make_trainer, tiny_config):
+    cfg = tiny_config(seq_len_start=4, seq_len_warmup_tokens=64 * 10)  # 64 tokens/step, ramp over 10 steps
+    t = make_trainer(cfg)
+    lens, tokens = [], []
+    for _ in range(14):
+        before = t.state.tokens_seen
+        lens.append(t.train_step()["seq_len"])
+        tokens.append(t.state.tokens_seen - before)
+    assert lens[0] == 4
+    assert lens[-1] == 16
+    assert lens == sorted(lens)
+    assert set(tokens) == {64}
