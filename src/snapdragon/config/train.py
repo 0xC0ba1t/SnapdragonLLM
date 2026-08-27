@@ -34,7 +34,7 @@ class TrainConfig:
     resume: str = "auto"  # auto | none | path to a checkpoint
     loss_spike_factor: float = 0.0  # skip steps whose loss exceeds factor times the EMA (0 disables)
     z_loss_coeff: float = 1e-4
-    ce_chunk_tokens: int = 4096
+    ce_chunk_tokens: int = 2048
     eval: EvalConfig = field(default_factory=EvalConfig)
 
     def __post_init__(self) -> None:

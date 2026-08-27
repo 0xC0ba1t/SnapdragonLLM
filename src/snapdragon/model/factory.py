@@ -27,7 +27,7 @@ def build_model(
     else:
         model_cfg = cfg
         z = 1e-4 if z_loss_coeff is None else z_loss_coeff
-        chunk = 4096 if ce_chunk_tokens is None else ce_chunk_tokens
+        chunk = 2048 if ce_chunk_tokens is None else ce_chunk_tokens
     with torch.device(device) if device is not None else _nullcontext():
         return CausalLM(model_cfg, z_loss_coeff=z, ce_chunk_tokens=chunk)
 

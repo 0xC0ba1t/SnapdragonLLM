@@ -67,3 +67,8 @@ def test_per_layer_activation_ordering():
     m = ModelConfig()
     none = activation_bytes_per_token_per_layer(m, "none")
     assert activation_bytes_per_token_per_layer(m, "full") < activation_bytes_per_token_per_layer(m, "sac") < none
+
+
+def test_default_ce_chunk_keeps_logit_memory_under_a_gigabyte():
+    # 2048 tokens x 32768 vocab x (fp32 logits + fp32 grad + bf16 copy)
+    assert estimate_memory(cfg_500m()).logits < 1.0
