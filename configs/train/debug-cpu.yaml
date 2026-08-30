@@ -1,0 +1,26 @@
+# Tiny end-to-end smoke run that works on any CPU in about a minute.
+# Needs data prepared with a 512-token tokenizer, or use tests/ for a synthetic dataset.
+extends: ../model/debug-tiny.yaml
+
+train:
+  run_name: debug-cpu
+  seq_len: 128
+  micro_batch_size: 4
+  global_batch_tokens: 2048
+  max_tokens: 1_000_000
+  precision: fp32
+  compile: "false"
+  log_every: 10
+  save_every: 100
+  seq_len_start: 32
+  seq_len_warmup_tokens: 100000
+
+data:
+  seq_len: 128
+  pin_memory: false
+  prefetch_batches: 2
+
+optim:
+  eight_bit: true
+  scheduler:
+    warmup_steps: 20

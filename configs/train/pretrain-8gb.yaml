@@ -1,0 +1,12 @@
+# 500M pretraining on an 8 GB GPU: full checkpointing, micro-batch 1, optimizer state kept in host RAM.
+extends: pretrain-16gb.yaml
+
+model:
+  act_ckpt: full
+
+train:
+  run_name: snapdragon-500m-8gb
+  micro_batch_size: 1
+
+optim:
+  offload_states: true

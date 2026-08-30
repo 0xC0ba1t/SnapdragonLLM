@@ -1,0 +1,21 @@
+# 126M model for fast iteration and ablations: about 1-2 days for 10B tokens on a 12 GB card.
+extends: ../model/snapdragon-125m.yaml
+
+train:
+  run_name: snapdragon-125m
+  seq_len: 2048
+  micro_batch_size: 8
+  global_batch_tokens: 524288
+  max_tokens: 10_000_000_000
+  precision: bf16
+  compile: auto
+  save_every: 1000
+
+data:
+  seq_len: 2048
+  sources:
+    - name: fineweb-edu
+      path: data/fineweb-edu
+
+model:
+  act_ckpt: none

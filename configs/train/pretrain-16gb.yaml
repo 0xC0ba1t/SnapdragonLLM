@@ -1,0 +1,36 @@
+# 500M pretraining on one 16 GB GPU (e.g. RTX 4060 Ti 16GB / 4080 / A4000).
+# Selective activation checkpointing keeps matmul outputs and only recomputes cheap pointwise ops.
+extends: ../model/snapdragon-500m.yaml
+
+model:
+  act_ckpt: sac
+
+train:
+  run_name: snapdragon-500m-16gb
+  seq_len: 2048
+  micro_batch_size: 4
+  global_batch_tokens: 524288    # 0.5M tokens per optimizer step -> 64 micro-batches per step
+  max_tokens: 10_000_000_000
+  precision: bf16
+  compile: auto
+  seq_len_start: 512
+  seq_len_warmup_tokens: 500_000_000
+  save_every: 500
+  keep_last_n: 3
+  loss_spike_factor: 3.0
+
+data:
+  seq_len: 2048
+  sources:
+    - name: fineweb-edu
+      path: data/fineweb-edu
+      weight: 1.0
+
+optim:
+  muon_lr: 0.02
+  adam_lr: 0.0006
+  eight_bit: true
+  scheduler:
+    kind: wsd
+    warmup_steps: 500
+    decay_fraction: 0.2
