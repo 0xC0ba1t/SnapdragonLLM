@@ -7,7 +7,7 @@ import torch
 
 from snapdragon.config.io import dump_config
 from snapdragon.config.schema import Config
-from snapdragon.data.factory import build_train_loader
+from snapdragon.data.factory import build_train_loader, build_val_loader
 from snapdragon.model.compile import compile_blocks, should_compile
 from snapdragon.model.factory import build_model, count_parameters
 from snapdragon.optim.factory import build_optimizer
@@ -17,6 +17,7 @@ from snapdragon.train.callbacks.checkpoint import CheckpointCallback, SignalHand
 from snapdragon.train.callbacks.loggers import ConsoleLogger, JsonlLogger
 from snapdragon.train.callbacks.monitors import DivergenceGuard, MemoryCallback, WeightNormCallback
 from snapdragon.train.callbacks.throughput import ThroughputCallback
+from snapdragon.train.callbacks.validation import ValLossCallback
 from snapdragon.train.checkpointing import maybe_resume
 from snapdragon.train.trainer import Trainer
 from snapdragon.utils.device import get_device
@@ -50,10 +51,12 @@ def build_trainer(
     world_size: int = 1,
     extra_callbacks: list[Callback] | None = None,
     train_loader=None,
+    val_loader=None,
 ) -> Trainer:
     """Build model, optimizer, schedule, data loader and callbacks, then resume if configured.
 
-    ``train_loader`` can be injected (tests, custom data); otherwise it comes from ``cfg.data``.
+    ``train_loader`` / ``val_loader`` can be injected (tests, custom data); otherwise they come from
+    ``cfg.data``. A run without a validation split simply skips validation.
     """
     dev = get_device(device)
     seed_everything(cfg.train.seed, rank)
@@ -65,6 +68,13 @@ def build_trainer(
     schedule = LRSchedule(optimizer, cfg.optim.scheduler, cfg.train.total_steps)
     loader = train_loader or build_train_loader(cfg, rank, world_size)
     callbacks = default_callbacks(cfg) + list(extra_callbacks or [])
+    if val_loader is None and cfg.data.sources:
+        try:
+            val_loader = build_val_loader(cfg, rank, world_size)
+        except (ValueError, FileNotFoundError) as e:
+            log.warning("no validation loader (%s); skipping validation", e)
+    if val_loader is not None:
+        callbacks.append(ValLossCallback(val_loader, cfg.train.eval.every_steps))
     trainer = Trainer(cfg, model, optimizer, schedule, loader, dev, callbacks, rank, world_size)
     if rank == 0:
         run_dir(cfg).mkdir(parents=True, exist_ok=True)

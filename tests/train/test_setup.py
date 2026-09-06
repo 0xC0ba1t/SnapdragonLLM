@@ -13,10 +13,11 @@ from snapdragon.train.setup import build_trainer, default_callbacks, run_dir
 
 def _write_learnable_dataset(path, n=20_000, vocab=64):
     """Token ids stay inside the tiny model's vocab; next token is a function of the previous one."""
-    with ShardWriter(path, "train", 10**9, eos_id=vocab - 1) as w:
-        w.add_document([(i * 5 + 3) % (vocab - 1) for i in range(n)])
     m = DatasetManifest(vocab_size=vocab, eos_id=vocab - 1)
-    m.shards = [ShardInfo(s, t, d, "train") for s, t, d in w.files]
+    for split, size in (("train", n), ("val", 1000)):
+        with ShardWriter(path, split, 10**9, eos_id=vocab - 1) as w:
+            w.add_document([(i * 5 + 3) % (vocab - 1) for i in range(size)])
+        m.shards += [ShardInfo(s, t, d, split) for s, t, d in w.files]
     m.save(path)
 
 
@@ -54,6 +55,24 @@ def test_end_to_end_run_from_a_config(tiny_config, tmp_path):
     saved = yaml.safe_load((run_dir(cfg) / "config.yaml").read_text())
     assert saved["model"]["n_layers"] == 2
     assert [s for s, _ in list_checkpoints(checkpoint_root(trainer))] == [10, 12]
+
+
+def test_validation_runs_when_the_dataset_has_a_val_split(tiny_config, tmp_path):
+    import json
+
+    cfg = _cfg(tiny_config, tmp_path)
+    cfg.train.eval.every_steps = 6
+    cfg.train.log_every = 1  # the jsonl logger only records logged steps
+    cfg.train.eval.val_batches = 2
+    trainer = build_trainer(cfg, device="cpu")
+    try:
+        trainer.fit()
+    finally:
+        trainer.train_loader.close()
+    rows = [json.loads(line) for line in (run_dir(cfg) / "metrics.jsonl").read_text().splitlines()]
+    with_val = [r["step"] for r in rows if "val_loss" in r]
+    assert with_val == [6, 12]
+    assert trainer.state.best_val_loss < float("inf")
 
 
 def test_rerun_resumes_from_the_last_checkpoint(tiny_config, tmp_path):
