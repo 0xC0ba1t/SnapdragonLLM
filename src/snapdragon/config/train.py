@@ -32,6 +32,7 @@ class TrainConfig:
     save_every: int = 500
     keep_last_n: int = 3
     resume: str = "auto"  # auto | none | path to a checkpoint
+    parallel: str = "ddp"  # ddp | none (data parallel when launched with torchrun)
     loss_spike_factor: float = 0.0  # skip steps whose loss exceeds factor times the EMA (0 disables)
     z_loss_coeff: float = 1e-4
     ce_chunk_tokens: int = 2048
@@ -40,6 +41,8 @@ class TrainConfig:
     def __post_init__(self) -> None:
         if self.precision not in PRECISIONS:
             raise ValueError(f"precision must be one of {PRECISIONS}, got {self.precision!r}")
+        if self.parallel not in ("ddp", "none"):
+            raise ValueError("parallel must be ddp or none")
         if self.compile not in ("auto", "true", "false"):
             raise ValueError("compile must be auto, true or false")
         if self.micro_batch_size < 1 or self.seq_len < 2:

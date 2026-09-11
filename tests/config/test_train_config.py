@@ -33,3 +33,10 @@ def test_seq_len_warmup_bounds():
 def test_fp16_training_is_not_offered():
     with pytest.raises(ValueError, match="precision"):
         TrainConfig(precision="fp16")
+
+
+def test_parallel_modes():
+    assert TrainConfig().parallel == "ddp"
+    assert TrainConfig(parallel="none").parallel == "none"
+    with pytest.raises(ValueError, match="parallel"):
+        TrainConfig(parallel="fsdp")

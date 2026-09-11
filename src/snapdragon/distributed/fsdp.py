@@ -1,4 +1,8 @@
-"""FSDP2 (``fully_shard``) wrapping: shard parameters, gradients and optimizer state across ranks.
+"""EXPERIMENTAL: FSDP2 (``fully_shard``) wrapping, not selectable from train.py yet.
+
+Shards parameters, gradients and optimizer state across ranks. Checkpointing sharded weights needs a
+collective full-state-dict gather on every rank, which the trainer does not do yet, so this module is
+library code only (its multi-process test runs on Linux CI).
 
 Use this when the model + optimizer do not fit one GPU even with checkpointing and 8-bit state.
 Muon needs whole matrices and the 8-bit AdamW works on flat local tensors, so under FSDP the optimizer

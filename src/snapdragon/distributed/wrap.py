@@ -7,7 +7,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 from snapdragon.distributed.env import DistEnv
 
-PARALLEL_MODES = ("none", "ddp", "fsdp")
+PARALLEL_MODES = ("none", "ddp")  # fsdp.py is experimental and deliberately not selectable here
 
 
 def wrap_ddp(model: nn.Module, env: DistEnv) -> nn.Module:
@@ -27,6 +27,4 @@ def wrap_model(model: nn.Module, env: DistEnv, mode: str) -> nn.Module:
         raise ValueError(f"parallel must be one of {PARALLEL_MODES}, got {mode!r}")
     if mode == "none" or not env.distributed:
         return model
-    if mode == "ddp":
-        return wrap_ddp(model, env)
-    raise NotImplementedError("fsdp is wired up in distributed.fsdp")
+    return wrap_ddp(model, env)
