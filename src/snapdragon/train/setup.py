@@ -8,6 +8,8 @@ import torch
 from snapdragon.config.io import dump_config
 from snapdragon.config.schema import Config
 from snapdragon.data.factory import build_train_loader, build_val_loader
+from snapdragon.distributed.env import DistEnv, detect_env, device_for, init_distributed
+from snapdragon.distributed.wrap import wrap_model
 from snapdragon.model.compile import compile_blocks, should_compile
 from snapdragon.model.factory import build_model, count_parameters
 from snapdragon.optim.factory import build_optimizer
@@ -47,8 +49,7 @@ def default_callbacks(cfg: Config) -> list[Callback]:
 def build_trainer(
     cfg: Config,
     device: str | None = None,
-    rank: int = 0,
-    world_size: int = 1,
+    env: DistEnv | None = None,
     extra_callbacks: list[Callback] | None = None,
     train_loader=None,
     val_loader=None,
@@ -58,7 +59,10 @@ def build_trainer(
     ``train_loader`` / ``val_loader`` can be injected (tests, custom data); otherwise they come from
     ``cfg.data``. A run without a validation split simply skips validation.
     """
-    dev = get_device(device)
+    env = env or detect_env()
+    init_distributed(env)
+    rank, world_size = env.rank, env.world_size
+    dev = device_for(env) if env.distributed and device is None else get_device(device)
     seed_everything(cfg.train.seed, rank)
     model = build_model(cfg).to(dev)
     log.info("model: %.1fM parameters on %s", count_parameters(model) / 1e6, dev)
@@ -66,6 +70,7 @@ def build_trainer(
         log.info("compiled %d blocks", compile_blocks(model))
     optimizer = build_optimizer(model, cfg.optim)
     schedule = LRSchedule(optimizer, cfg.optim.scheduler, cfg.train.total_steps)
+    model = wrap_model(model, env, cfg.train.parallel)  # DDP shares the parameter objects, so the optimizer stays valid
     loader = train_loader or build_train_loader(cfg, rank, world_size)
     callbacks = default_callbacks(cfg) + list(extra_callbacks or [])
     if val_loader is None and cfg.data.sources:

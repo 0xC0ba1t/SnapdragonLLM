@@ -94,3 +94,18 @@ def test_rerun_resumes_from_the_last_checkpoint(tiny_config, tmp_path):
         second.train_loader.close()
     assert end.step == 15
     assert torch.isfinite(torch.tensor(end.loss_ema))
+
+
+def test_explicit_single_process_env_trains_without_a_process_group(tiny_config, tmp_path):
+    import torch.distributed as dist
+
+    from snapdragon.distributed.env import DistEnv
+
+    cfg = _cfg(tiny_config, tmp_path)
+    trainer = build_trainer(cfg, device="cpu", env=DistEnv())
+    try:
+        assert trainer.world_size == 1
+        assert trainer.model is trainer.raw_model  # not wrapped in DDP
+        assert not dist.is_initialized()
+    finally:
+        trainer.train_loader.close()

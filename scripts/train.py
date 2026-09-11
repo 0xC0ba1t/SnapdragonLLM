@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 
 from snapdragon.config.io import load_config
+from snapdragon.distributed.env import cleanup_distributed
 from snapdragon.train.setup import build_trainer, device_summary
 from snapdragon.utils.logging import get_logger, setup_logging
 
@@ -29,14 +30,16 @@ def main(argv: list[str] | None = None) -> None:
     setup_logging()
     cfg = load_config(args.config, args.overrides)
     trainer = build_trainer(cfg, device=args.device)
-    log.info("device: %s | steps: %d | grad accum: %d", device_summary(trainer.device),
-             trainer.total_steps, trainer.grad_accum_steps)
+    if trainer.is_main:
+        log.info("device: %s | ranks: %d | steps: %d | grad accum: %d", device_summary(trainer.device),
+                 trainer.world_size, trainer.total_steps, trainer.grad_accum_steps)
     try:
         trainer.fit()
     finally:
         close = getattr(trainer.train_loader, "close", None)
         if close:
             close()
+        cleanup_distributed()
 
 
 if __name__ == "__main__":
