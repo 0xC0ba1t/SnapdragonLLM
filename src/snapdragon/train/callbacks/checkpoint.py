@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import signal
 
+from snapdragon.distributed.env import barrier
 from snapdragon.train.callbacks.base import Callback
 from snapdragon.train.checkpointing import save_trainer_checkpoint
 from snapdragon.utils.logging import get_logger
@@ -25,10 +26,12 @@ class CheckpointCallback(Callback):
         self.every = every
         self._last_saved_step = -1
 
-    def _save(self, trainer) -> None:
+    def _save(self, trainer, sync: bool = True) -> None:
         if trainer.is_main and trainer.state.step != self._last_saved_step:
             save_trainer_checkpoint(trainer)
-            self._last_saved_step = trainer.state.step
+        self._last_saved_step = trainer.state.step
+        if sync:
+            barrier()  # other ranks wait for rank 0's write instead of racing ahead into a collective timeout
 
     def on_step_end(self, trainer, metrics: dict) -> None:
         if metrics["step"] % self.every == 0:
@@ -40,7 +43,7 @@ class CheckpointCallback(Callback):
     def on_exception(self, trainer, exc: BaseException) -> None:
         if isinstance(exc, KeyboardInterrupt) and trainer.state.step > 0:
             log.warning("interrupted: saving an emergency checkpoint")
-            self._save(trainer)
+            self._save(trainer, sync=False)  # peers may not be at a barrier; never block while failing
 
 
 class SignalHandler(Callback):

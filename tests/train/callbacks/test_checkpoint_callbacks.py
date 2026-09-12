@@ -83,3 +83,20 @@ def test_sigterm_stops_cleanly_and_a_final_checkpoint_is_written(make_trainer, c
     assert state.step == 4
     assert [s for s, _ in list_checkpoints(checkpoint_root(t))] == [4]
     assert signal.getsignal(signal.SIGINT) is before  # handlers are restored
+
+
+def test_ranks_barrier_after_a_save_but_not_during_an_emergency_save(make_trainer, cfg, monkeypatch):
+    calls = []
+    monkeypatch.setattr("snapdragon.train.callbacks.checkpoint.barrier", lambda: calls.append("barrier"))
+
+    class Interrupt(Callback):
+        priority = 20
+
+        def on_step_end(self, trainer, metrics):
+            if metrics["step"] == 7:
+                raise KeyboardInterrupt
+
+    t = make_trainer(cfg, callbacks=[Interrupt(), CheckpointCallback(every=5)])
+    with pytest.raises(KeyboardInterrupt):
+        t.fit()
+    assert calls == ["barrier"]  # one for the periodic save at step 5, none for the emergency save
