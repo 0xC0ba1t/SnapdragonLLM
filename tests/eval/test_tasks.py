@@ -68,3 +68,18 @@ def test_arc_tasks_accept_injected_rows_and_limit():
     assert len(list(arc_challenge(iter([ARC_ROW] * 4), limit=2))) == 2
     assert "arc_easy" in TASKS
     assert "arc_challenge" in TASKS
+
+
+def test_piqa_pairs_questions_with_the_separate_label_file(tmp_path):
+    from snapdragon.eval.tasks import piqa
+
+    (tmp_path / "valid.jsonl").write_text(
+        "\n".join(json.dumps({"goal": f"goal {i}", "sol1": f"a{i}", "sol2": f"b{i}"}) for i in range(3)) + "\n"
+    )
+    (tmp_path / "labels.lst").write_text("0\n1\n1\n")
+    out = list(piqa(tmp_path / "valid.jsonl", tmp_path / "labels.lst"))
+    assert [e.label for e in out] == [0, 1, 1]
+    assert out[1].context == "Question: goal 1\nAnswer:"
+    assert out[1].choices == [" a1", " b1"]
+    assert len(list(piqa(tmp_path / "valid.jsonl", tmp_path / "labels.lst", limit=2))) == 2
+    assert "piqa" in TASKS

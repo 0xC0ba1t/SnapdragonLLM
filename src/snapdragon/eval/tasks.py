@@ -84,3 +84,22 @@ def arc_easy(rows: Iterator[dict] | None = None, limit: int = 0) -> Iterator[MCE
 @TASKS.register("arc_challenge")
 def arc_challenge(rows: Iterator[dict] | None = None, limit: int = 0) -> Iterator[MCExample]:
     return _arc("ARC-Challenge", rows, limit)
+
+
+def piqa_example(row: dict, label: int) -> MCExample:
+    return MCExample(
+        context=f"Question: {row['goal']}\nAnswer:",
+        choices=[" " + row["sol1"], " " + row["sol2"]],
+        label=label,
+    )
+
+
+@TASKS.register("piqa")
+def piqa(path: str | Path | None = None, labels_path: str | Path | None = None, limit: int = 0) -> Iterator[MCExample]:
+    """PIQA validation set: questions in jsonl, answers in a separate one-label-per-line file."""
+    rows = _read_jsonl(path or fetch(PIQA_URL))
+    labels = Path(labels_path or fetch(PIQA_LABELS_URL)).read_text().split()
+    for i, (row, label) in enumerate(zip(rows, labels, strict=False)):
+        if limit and i >= limit:
+            return
+        yield piqa_example(row, int(label))
