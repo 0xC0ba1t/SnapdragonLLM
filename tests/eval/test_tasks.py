@@ -35,3 +35,36 @@ def test_loader_reads_jsonl_and_honours_limit(tmp_path):
 def test_registered_under_its_name():
     assert "hellaswag" in TASKS
     assert TASKS.get("hellaswag") is hellaswag
+
+
+ARC_ROW = {
+    "id": "x",
+    "question": "Which gas do plants absorb?",
+    "choices": {"text": ["oxygen", "carbon dioxide", "helium"], "label": ["A", "B", "C"]},
+    "answerKey": "B",
+}
+
+
+def test_arc_example_format_and_label_lookup():
+    from snapdragon.eval.tasks import arc_example
+
+    ex = arc_example(ARC_ROW)
+    assert ex.context == "Question: Which gas do plants absorb?\nAnswer:"
+    assert ex.choices == [" oxygen", " carbon dioxide", " helium"]
+    assert ex.label == 1
+
+
+def test_arc_handles_numeric_answer_keys():
+    from snapdragon.eval.tasks import arc_example
+
+    row = {**ARC_ROW, "choices": {"text": ["a", "b", "c", "d"], "label": ["1", "2", "3", "4"]}, "answerKey": "4"}
+    assert arc_example(row).label == 3
+
+
+def test_arc_tasks_accept_injected_rows_and_limit():
+    from snapdragon.eval.tasks import arc_challenge, arc_easy
+
+    assert len(list(arc_easy(iter([ARC_ROW] * 4)))) == 4
+    assert len(list(arc_challenge(iter([ARC_ROW] * 4), limit=2))) == 2
+    assert "arc_easy" in TASKS
+    assert "arc_challenge" in TASKS

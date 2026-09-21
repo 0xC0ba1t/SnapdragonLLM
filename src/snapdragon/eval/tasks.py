@@ -49,3 +49,38 @@ def hellaswag(path: str | Path | None = None, limit: int = 0) -> Iterator[MCExam
         if limit and i >= limit:
             return
         yield hellaswag_example(row)
+
+
+def arc_example(row: dict) -> MCExample:
+    """AI2 ARC row (HuggingFace ``allenai/ai2_arc`` schema)."""
+    labels = list(row["choices"]["label"])
+    return MCExample(
+        context=f"Question: {row['question']}\nAnswer:",
+        choices=[" " + t for t in row["choices"]["text"]],
+        label=labels.index(row["answerKey"]),
+    )
+
+
+def _hf_rows(name: str, config: str, split: str) -> Iterator[dict]:
+    try:
+        from datasets import load_dataset
+    except ImportError as e:  # pragma: no cover
+        raise ImportError("install the 'data' extra: pip install -e .[data]") from e
+    yield from load_dataset(name, config, split=split)
+
+
+def _arc(config: str, rows: Iterator[dict] | None, limit: int) -> Iterator[MCExample]:
+    for i, row in enumerate(rows if rows is not None else _hf_rows("allenai/ai2_arc", config, "test")):
+        if limit and i >= limit:
+            return
+        yield arc_example(row)
+
+
+@TASKS.register("arc_easy")
+def arc_easy(rows: Iterator[dict] | None = None, limit: int = 0) -> Iterator[MCExample]:
+    return _arc("ARC-Easy", rows, limit)
+
+
+@TASKS.register("arc_challenge")
+def arc_challenge(rows: Iterator[dict] | None = None, limit: int = 0) -> Iterator[MCExample]:
+    return _arc("ARC-Challenge", rows, limit)
