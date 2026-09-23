@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -62,14 +63,22 @@ def latest_checkpoint(root: str | Path) -> Path | None:
     return found[-1][1] if found else None
 
 
-def load_checkpoint(path: str | Path, map_location: str | torch.device = "cpu") -> dict[str, Any]:
-    """Load every ``<name>.pt`` component of a checkpoint directory."""
+def load_checkpoint(
+    path: str | Path, map_location: str | torch.device = "cpu", only: Iterable[str] | None = None
+) -> dict[str, Any]:
+    """Load the ``<name>.pt`` components of a checkpoint directory (all, or just those in ``only``;
+    skipping the optimizer state makes loading for inference several times faster)."""
     path = Path(path)
     if not (path / COMPLETE).exists():
         raise FileNotFoundError(f"{path} is not a complete checkpoint (missing {COMPLETE} marker)")
+    wanted = None if only is None else set(only)
+    missing = (wanted or set()) - {f.stem for f in path.glob("*.pt")}
+    if missing:
+        raise KeyError(f"checkpoint {path} has no component(s) {sorted(missing)}")
     return {
         f.stem: torch.load(f, map_location=map_location, weights_only=False)
         for f in sorted(path.glob("*.pt"))
+        if wanted is None or f.stem in wanted
     }
 
 

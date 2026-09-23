@@ -83,3 +83,13 @@ def test_prune_requires_positive_keep(tmp_path):
 
     with pytest.raises(ValueError, match="at least 1"):
         prune_checkpoints(tmp_path, 0)
+
+
+def test_load_only_selected_components(tmp_path):
+    from snapdragon.checkpoint.io import load_checkpoint
+
+    path = save_checkpoint(tmp_path, 3, {"model": {"w": 1}, "optim": {"huge": 2}, "meta": {"v": 3}})
+    got = load_checkpoint(path, only=["model", "meta"])
+    assert set(got) == {"model", "meta"}
+    with pytest.raises(KeyError, match="no component"):
+        load_checkpoint(path, only=["nope"])
