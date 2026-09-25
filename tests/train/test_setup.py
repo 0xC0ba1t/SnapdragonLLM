@@ -109,3 +109,20 @@ def test_explicit_single_process_env_trains_without_a_process_group(tiny_config,
         assert not dist.is_initialized()
     finally:
         trainer.train_loader.close()
+
+
+def test_benchmark_callback_is_added_only_when_requested_and_possible(tiny_config, tmp_path, small_tokenizer):
+    from snapdragon.train.callbacks.benchmarks import BenchmarkCallback
+
+    cfg = _cfg(tiny_config, tmp_path)
+    cfg.train.eval.benchmark_every = 5
+    cfg.data.tokenizer_path = str(tmp_path / "missing.json")
+    t = build_trainer(cfg, device="cpu")
+    t.train_loader.close()
+    assert not any(isinstance(c, BenchmarkCallback) for c in t.callbacks)
+
+    small_tokenizer.save(tmp_path / "tok.json")
+    cfg.data.tokenizer_path = str(tmp_path / "tok.json")
+    t = build_trainer(cfg, device="cpu")
+    t.train_loader.close()
+    assert any(isinstance(c, BenchmarkCallback) for c in t.callbacks)

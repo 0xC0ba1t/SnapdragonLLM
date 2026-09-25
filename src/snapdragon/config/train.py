@@ -10,7 +10,8 @@ PRECISIONS = ("bf16", "fp32")
 @dataclass
 class EvalConfig:
     tasks: list[str] = field(default_factory=lambda: ["hellaswag"])
-    every_steps: int = 1000
+    every_steps: int = 1000  # validation loss cadence
+    benchmark_every: int = 0  # run `tasks` during training every N steps (0 disables; needs downloads)
     limit: int = 0  # 0 means the full task
     val_batches: int = 20
 

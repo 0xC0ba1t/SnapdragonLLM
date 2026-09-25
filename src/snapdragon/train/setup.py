@@ -14,7 +14,9 @@ from snapdragon.model.compile import compile_blocks, should_compile
 from snapdragon.model.factory import build_model, count_parameters
 from snapdragon.optim.factory import build_optimizer
 from snapdragon.optim.schedulers import LRSchedule
+from snapdragon.tokenizer.fast import FastTokenizer
 from snapdragon.train.callbacks.base import Callback
+from snapdragon.train.callbacks.benchmarks import BenchmarkCallback
 from snapdragon.train.callbacks.checkpoint import CheckpointCallback, SignalHandler
 from snapdragon.train.callbacks.loggers import ConsoleLogger, JsonlLogger
 from snapdragon.train.callbacks.monitors import DivergenceGuard, MemoryCallback, WeightNormCallback
@@ -80,6 +82,12 @@ def build_trainer(
             log.warning("no validation loader (%s); skipping validation", e)
     if val_loader is not None:
         callbacks.append(ValLossCallback(val_loader, cfg.train.eval.every_steps))
+    ev = cfg.train.eval
+    if ev.benchmark_every > 0 and Path(cfg.data.tokenizer_path).exists():
+        tok = FastTokenizer.from_file(cfg.data.tokenizer_path)
+        callbacks.append(BenchmarkCallback(tok, ev.tasks, ev.benchmark_every, ev.limit))
+    elif ev.benchmark_every > 0:
+        log.warning("benchmark_every is set but %s does not exist; skipping benchmarks", cfg.data.tokenizer_path)
     trainer = Trainer(cfg, model, optimizer, schedule, loader, dev, callbacks, rank, world_size)
     if rank == 0:
         run_dir(cfg).mkdir(parents=True, exist_ok=True)
