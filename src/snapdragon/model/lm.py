@@ -26,8 +26,9 @@ class CausalLM(nn.Module):
         targets: torch.Tensor | None = None,
         position_ids: torch.Tensor | None = None,
         attn_mask=None,
+        cache=None,
     ):
-        hidden = self.transformer(tokens, position_ids, attn_mask)
+        hidden = self.transformer(tokens, position_ids, attn_mask, cache)
         if targets is None:
             return self.transformer.logits(hidden)
         out = lm_loss(

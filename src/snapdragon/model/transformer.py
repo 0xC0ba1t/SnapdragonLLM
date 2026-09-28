@@ -65,13 +65,20 @@ class Transformer(nn.Module):
         return self.embed.weight if self.lm_head is None else self.lm_head.weight
 
     def forward(
-        self, tokens: torch.Tensor, position_ids: torch.Tensor | None = None, attn_mask=None
+        self, tokens: torch.Tensor, position_ids: torch.Tensor | None = None, attn_mask=None, cache=None
     ) -> torch.Tensor:
+        """``cache`` (a KVCache) switches to incremental decoding: tokens are the *new* tokens, their
+        positions continue from ``cache.pos``, and the cache is advanced once all layers have run."""
         if tokens.shape[1] > self.cfg.max_seq_len:
             raise ValueError(f"sequence length {tokens.shape[1]} exceeds max_seq_len {self.cfg.max_seq_len}")
+        if cache is not None and position_ids is None:
+            T = tokens.shape[1]
+            position_ids = torch.arange(cache.pos, cache.pos + T, device=tokens.device).expand(tokens.shape[0], T)
         x = self.embed(tokens)
         for i, block in enumerate(self.blocks):
-            if self.training and self.cfg.act_ckpt == "sac":
+            if cache is not None:
+                x = block(x, self.rope, position_ids, attn_mask, cache, i)
+            elif self.training and self.cfg.act_ckpt == "sac":
                 # keep matmul/attention outputs, recompute only the cheap pointwise ops
                 x = checkpoint(block, x, self.rope, position_ids, attn_mask,
                                use_reentrant=False, context_fn=_SAC_CONTEXT)
@@ -79,6 +86,8 @@ class Transformer(nn.Module):
                 x = checkpoint(block, x, self.rope, position_ids, attn_mask, use_reentrant=False)
             else:
                 x = block(x, self.rope, position_ids, attn_mask)
+        if cache is not None:
+            cache.advance(tokens.shape[1])
         return self.final_norm(x)
 
     def _checkpoint_block(self, i: int) -> bool:

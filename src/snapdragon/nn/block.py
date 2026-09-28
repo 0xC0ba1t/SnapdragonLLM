@@ -25,6 +25,8 @@ class Block(nn.Module):
         rope: RotaryEmbedding,
         position_ids: torch.Tensor | None = None,
         attn_mask=None,
+        cache=None,
+        layer_idx: int = 0,
     ) -> torch.Tensor:
-        x = x + self.attn(self.attn_norm(x), rope, position_ids, attn_mask)
+        x = x + self.attn(self.attn_norm(x), rope, position_ids, attn_mask, cache, layer_idx)
         return x + self.mlp(self.mlp_norm(x))
