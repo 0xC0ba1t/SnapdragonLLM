@@ -81,3 +81,38 @@ def test_empirical_distribution_matches_softmax():
     freq = torch.bincount(draws, minlength=3) / 4000
     assert torch.allclose(freq, expected, atol=0.03)
     assert float("-inf") == NEG_INF
+
+
+def test_min_p_cutoff_scales_with_the_top_probability():
+    from snapdragon.inference.sampling import apply_min_p
+
+    probs = torch.tensor([[0.6, 0.3, 0.08, 0.02]])
+    kept = torch.isfinite(apply_min_p(probs.log(), 0.2))[0]  # floor = 0.2 * 0.6 = 0.12
+    assert kept.tolist() == [True, True, False, False]
+    flat = torch.full((1, 4), 0.25).log()
+    assert torch.isfinite(apply_min_p(flat, 0.5)).all()  # flat distribution: nothing is dropped
+    assert torch.equal(apply_min_p(flat, 0.0), flat)
+
+
+def test_repetition_penalty_pushes_seen_tokens_down_whatever_their_sign():
+    from snapdragon.inference.sampling import apply_repetition_penalty
+
+    logits = torch.tensor([[2.0, -2.0, 1.0, 0.5]])
+    out = apply_repetition_penalty(logits, torch.tensor([[0, 1]]), 2.0)
+    assert out.tolist() == [[1.0, -4.0, 1.0, 0.5]]  # seen: 2/2 and -2*2; unseen unchanged
+    assert torch.equal(apply_repetition_penalty(logits, torch.tensor([[0]]), 1.0), logits)
+    assert torch.equal(apply_repetition_penalty(logits, torch.empty(1, 0, dtype=torch.long), 2.0), logits)
+
+
+def test_penalty_can_flip_the_greedy_choice():
+    logits = torch.tensor([[3.0, 2.9]])
+    cfg = SamplingConfig(temperature=0, repetition_penalty=1.5)
+    assert int(sample_next(logits, cfg)) == 0
+    assert int(sample_next(logits, cfg, history=torch.tensor([[0]]))) == 1
+
+
+def test_min_p_in_the_full_pipeline_never_samples_below_the_floor():
+    logits = torch.tensor([[5.0, 4.9, -3.0, -4.0]])
+    cfg = SamplingConfig(temperature=1.0, min_p=0.3)
+    g = torch.Generator().manual_seed(0)
+    assert {int(sample_next(logits, cfg, g)) for _ in range(200)} <= {0, 1}

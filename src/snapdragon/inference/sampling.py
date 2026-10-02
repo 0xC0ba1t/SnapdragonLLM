@@ -53,14 +53,41 @@ def apply_top_p(logits: torch.Tensor, p: float) -> torch.Tensor:
     return torch.full_like(logits, NEG_INF).scatter(-1, order, sorted_logits)
 
 
+def apply_min_p(logits: torch.Tensor, min_p: float) -> torch.Tensor:
+    """Drop tokens whose probability is below ``min_p`` times the most likely token's probability.
+    Unlike top-p the cutoff adapts to confidence: sharp distributions keep few tokens, flat ones many."""
+    if min_p <= 0.0:
+        return logits
+    probs = torch.softmax(logits, dim=-1)
+    floor = min_p * probs.max(dim=-1, keepdim=True).values
+    return logits.masked_fill(probs < floor, NEG_INF)
+
+
+def apply_repetition_penalty(logits: torch.Tensor, history: torch.Tensor, penalty: float) -> torch.Tensor:
+    """CTRL-style: tokens already in ``history`` (B, S) get their logit divided (if positive) or
+    multiplied (if negative) by ``penalty``, so they become less likely either way."""
+    if penalty == 1.0 or history.numel() == 0:
+        return logits
+    seen = torch.zeros_like(logits, dtype=torch.bool).scatter(-1, history, True)
+    penalised = torch.where(logits > 0, logits / penalty, logits * penalty)
+    return torch.where(seen, penalised, logits)
+
+
 def sample_next(
-    logits: torch.Tensor, cfg: SamplingConfig, generator: torch.Generator | None = None
+    logits: torch.Tensor,
+    cfg: SamplingConfig,
+    generator: torch.Generator | None = None,
+    history: torch.Tensor | None = None,
 ) -> torch.Tensor:
-    """logits (B, V) -> next token ids (B,)."""
+    """logits (B, V) -> next token ids (B,). ``history`` (B, S) feeds the repetition penalty."""
+    logits = logits.float()
+    if history is not None:
+        logits = apply_repetition_penalty(logits, history, cfg.repetition_penalty)
     if cfg.greedy:
         return logits.argmax(dim=-1)
-    logits = logits.float() / cfg.temperature
+    logits = logits / cfg.temperature
     logits = apply_top_k(logits, cfg.top_k)
     logits = apply_top_p(logits, cfg.top_p)
+    logits = apply_min_p(logits, cfg.min_p)
     probs = torch.softmax(logits, dim=-1)
     return torch.multinomial(probs, 1, generator=generator).squeeze(-1)
