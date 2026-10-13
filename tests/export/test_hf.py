@@ -64,3 +64,19 @@ def test_export_writes_loadable_files(tmp_path):
     out = export_hf(build_model(CFG), tmp_path)
     assert json.loads((out / "config.json").read_text())["architectures"] == ["Qwen3ForCausalLM"]
     assert (out / "model.safetensors").stat().st_size > 0
+
+
+def test_greedy_generation_matches_transformers_generate(tmp_path):
+    transformers = pytest.importorskip("transformers")
+    from snapdragon.inference.generate import generate
+    from snapdragon.inference.sampling import SamplingConfig
+
+    torch.manual_seed(0)
+    ours = build_model(CFG).eval()
+    export_hf(ours, tmp_path, dtype=torch.float32)
+    hf = transformers.AutoModelForCausalLM.from_pretrained(tmp_path, torch_dtype=torch.float32).eval()
+    prompt = [5, 17, 3, 44, 9]
+    mine = generate(ours, prompt, 10, SamplingConfig(temperature=0)).token_ids
+    with torch.no_grad():
+        theirs = hf.generate(torch.tensor([prompt]), max_new_tokens=10, do_sample=False, pad_token_id=0)[0, 5:].tolist()
+    assert mine == theirs  # cached incremental decoding agrees with HF's reference implementation
