@@ -29,5 +29,7 @@ class Config:
             raise ValueError(
                 f"data.seq_len {self.data.seq_len} must equal train.seq_len {self.train.seq_len}"
             )
+        if self.train.task == "sft" and not self.data.sft_path:
+            raise ValueError("train.task='sft' needs data.sft_path")
         if self.data.doc_masking and self.model.attn_impl != "flex":
             raise ValueError("data.doc_masking requires model.attn_impl='flex'")

@@ -20,6 +20,7 @@ class SourceConfig:
 @dataclass
 class DataConfig:
     sources: list[SourceConfig] = field(default_factory=list)
+    sft_path: str = ""  # jsonl of {"messages": [...]} conversations, used when train.task == "sft"
     tokenizer_path: str = "data/tokenizer/snapdragon-32k.json"
     seq_len: int = 2048
     doc_masking: bool = False  # attend only within a document (needs the flex attention path)

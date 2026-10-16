@@ -27,3 +27,20 @@ def test_doc_masking_needs_flex():
     cfg.data.doc_masking = True
     with pytest.raises(ValueError, match="flex"):
         cfg.validate()
+
+
+def test_sft_task_needs_a_dataset_path():
+    cfg = Config()
+    cfg.train.task = "sft"
+    with pytest.raises(ValueError, match="sft_path"):
+        cfg.validate()
+    cfg.data.sft_path = "chats.jsonl"
+    cfg.validate()
+
+
+def test_unknown_task_is_rejected():
+    from snapdragon.config.train import TrainConfig
+
+    with pytest.raises(ValueError, match="task must be"):
+        TrainConfig(task="rlhf")
+    assert TrainConfig().init_from == ""

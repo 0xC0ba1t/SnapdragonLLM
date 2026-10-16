@@ -33,6 +33,8 @@ class TrainConfig:
     save_every: int = 500
     keep_last_n: int = 3
     resume: str = "auto"  # auto | none | path to a checkpoint
+    task: str = "pretrain"  # pretrain | sft
+    init_from: str = ""  # checkpoint to take initial *weights* from (fresh optimizer/schedule), e.g. for sft
     parallel: str = "ddp"  # ddp | none (data parallel when launched with torchrun)
     loss_spike_factor: float = 0.0  # skip steps whose loss exceeds factor times the EMA (0 disables)
     z_loss_coeff: float = 1e-4
@@ -42,6 +44,8 @@ class TrainConfig:
     def __post_init__(self) -> None:
         if self.precision not in PRECISIONS:
             raise ValueError(f"precision must be one of {PRECISIONS}, got {self.precision!r}")
+        if self.task not in ("pretrain", "sft"):
+            raise ValueError("task must be pretrain or sft")
         if self.parallel not in ("ddp", "none"):
             raise ValueError("parallel must be ddp or none")
         if self.compile not in ("auto", "true", "false"):
