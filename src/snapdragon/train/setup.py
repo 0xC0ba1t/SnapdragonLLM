@@ -5,6 +5,7 @@ from pathlib import Path
 
 import torch
 
+from snapdragon.checkpoint.model_io import load_weights_into
 from snapdragon.config.io import dump_config
 from snapdragon.config.schema import Config
 from snapdragon.data.factory import build_train_loader, build_val_loader
@@ -68,6 +69,9 @@ def build_trainer(
     seed_everything(cfg.train.seed, rank)
     model = build_model(cfg).to(dev)
     log.info("model: %.1fM parameters on %s", count_parameters(model) / 1e6, dev)
+    if cfg.train.init_from:
+        load_weights_into(model, cfg.train.init_from, cfg.model)
+        log.info("initialised weights from %s", cfg.train.init_from)
     if should_compile(cfg.train.compile):
         log.info("compiled %d blocks", compile_blocks(model))
     optimizer = build_optimizer(model, cfg.optim)

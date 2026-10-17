@@ -36,3 +36,26 @@ def test_accepts_a_specific_step_directory(trained):
 def test_no_checkpoint_is_a_clear_error(tmp_path):
     with pytest.raises(FileNotFoundError, match="no complete checkpoint"):
         resolve_checkpoint(tmp_path)
+
+
+def test_load_weights_into_copies_weights_only(trained):
+    import dataclasses
+
+    from snapdragon.checkpoint.model_io import load_weights_into
+    from snapdragon.model.factory import build_model
+
+    fresh = build_model(dataclasses.replace(trained.cfg.model, init_seed=777))
+    assert not torch.equal(fresh.transformer.embed.weight, trained.raw_model.transformer.embed.weight)
+    load_weights_into(fresh, checkpoint_root(trained))
+    assert torch.equal(fresh.transformer.embed.weight, trained.raw_model.transformer.embed.weight)
+
+
+def test_load_weights_into_rejects_a_different_architecture(trained):
+    import dataclasses
+
+    from snapdragon.checkpoint.model_io import load_weights_into
+    from snapdragon.model.factory import build_model
+
+    other = build_model(dataclasses.replace(trained.cfg.model, n_layers=3))
+    with pytest.raises(ValueError, match="architecture differs.*n_layers"):
+        load_weights_into(other, checkpoint_root(trained))

@@ -13,6 +13,8 @@ from snapdragon.train.setup import build_trainer, default_callbacks, run_dir
 
 def _write_learnable_dataset(path, n=20_000, vocab=64):
     """Token ids stay inside the tiny model's vocab; next token is a function of the previous one."""
+    if (path / "manifest.json").exists():
+        return  # already written (and possibly memory-mapped by an earlier run in the same test)
     m = DatasetManifest(vocab_size=vocab, eos_id=vocab - 1)
     for split, size in (("train", n), ("val", 1000)):
         with ShardWriter(path, split, 10**9, eos_id=vocab - 1) as w:
@@ -126,3 +128,28 @@ def test_benchmark_callback_is_added_only_when_requested_and_possible(tiny_confi
     t = build_trainer(cfg, device="cpu")
     t.train_loader.close()
     assert any(isinstance(c, BenchmarkCallback) for c in t.callbacks)
+
+
+def test_init_from_starts_a_new_run_from_pretrained_weights(tiny_config, tmp_path):
+    from snapdragon.train.checkpointing import save_trainer_checkpoint
+
+    base_cfg = _cfg(tiny_config, tmp_path)
+    base_cfg.train.run_name = "base"
+    base = build_trainer(base_cfg, device="cpu")
+    try:
+        for _ in range(3):
+            base.train_step()
+        save_trainer_checkpoint(base)
+    finally:
+        base.train_loader.close()
+
+    new_cfg = _cfg(tiny_config, tmp_path)
+    new_cfg.train.run_name = "finetune"
+    new_cfg.train.init_from = str(tmp_path / "runs" / "base" / "checkpoints")
+    new_cfg.model.init_seed = 999  # a different random init that init_from must overwrite
+    fresh = build_trainer(new_cfg, device="cpu")
+    try:
+        assert fresh.state.step == 0  # weights only: a new run, not a resume
+        assert torch.equal(fresh.raw_model.transformer.embed.weight, base.raw_model.transformer.embed.weight)
+    finally:
+        fresh.train_loader.close()
