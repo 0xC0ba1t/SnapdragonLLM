@@ -15,6 +15,7 @@ from snapdragon.model.compile import compile_blocks, should_compile
 from snapdragon.model.factory import build_model, count_parameters
 from snapdragon.optim.factory import build_optimizer
 from snapdragon.optim.schedulers import LRSchedule
+from snapdragon.sft.factory import build_sft_loader
 from snapdragon.tokenizer.fast import FastTokenizer
 from snapdragon.train.callbacks.base import Callback
 from snapdragon.train.callbacks.benchmarks import BenchmarkCallback
@@ -77,7 +78,12 @@ def build_trainer(
     optimizer = build_optimizer(model, cfg.optim)
     schedule = LRSchedule(optimizer, cfg.optim.scheduler, cfg.train.total_steps)
     model = wrap_model(model, env, cfg.train.parallel)  # DDP shares the parameter objects, so the optimizer stays valid
-    loader = train_loader or build_train_loader(cfg, rank, world_size)
+    if train_loader is not None:
+        loader = train_loader
+    elif cfg.train.task == "sft":
+        loader = build_sft_loader(cfg, rank, world_size)
+    else:
+        loader = build_train_loader(cfg, rank, world_size)
     callbacks = default_callbacks(cfg) + list(extra_callbacks or [])
     if val_loader is None and cfg.data.sources:
         try:
