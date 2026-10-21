@@ -1,0 +1,9 @@
+# Supervised fine-tuning on a 12 GB GPU: same recipe, full activation checkpointing.
+extends: sft-500m-16gb.yaml
+
+model:
+  act_ckpt: full
+
+train:
+  run_name: snapdragon-500m-sft-12gb
+  micro_batch_size: 2

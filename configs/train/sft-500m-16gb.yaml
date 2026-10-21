@@ -1,0 +1,25 @@
+# Supervised fine-tuning of the pretrained 500M model on chat data (16 GB GPU).
+# Prepare data with scripts/prepare_sft.py, pretrain first, then point init_from at that run.
+extends: pretrain-16gb.yaml
+
+train:
+  run_name: snapdragon-500m-sft
+  task: sft
+  init_from: runs/snapdragon-500m-16gb/checkpoints   # weights only; optimizer and schedule start fresh
+  global_batch_tokens: 65536                           # much smaller than pretraining: 8 micro-batches/step
+  max_tokens: 300_000_000
+  seq_len_warmup_tokens: 0                             # the model already knows long contexts
+  save_every: 200
+  loss_spike_factor: 0.0
+
+data:
+  sft_path: data/sft/chat.jsonl
+  tokenizer_path: data/tokenizer/snapdragon-32k.json
+
+optim:
+  muon_lr: 0.004      # roughly 5x below pretraining: fine-tuning should nudge, not overwrite
+  adam_lr: 0.0001
+  scheduler:
+    kind: cosine
+    warmup_steps: 30
+    min_lr_ratio: 0.1

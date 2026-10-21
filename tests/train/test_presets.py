@@ -50,3 +50,15 @@ def test_estimate_memory_cli_prints_a_table(capsys):
     assert total < 15
     with pytest.raises(SystemExit, match="exceeds"):
         mod.main(["--config", str(TRAIN / "pretrain-16gb.yaml"), "--budget-gb", "5"])
+
+
+@pytest.mark.parametrize("name", ["sft-500m-16gb", "sft-500m-12gb"])
+def test_sft_presets_are_wired_for_chat_data(name):
+    cfg = load_config(TRAIN / f"{name}.yaml")
+    assert cfg.train.task == "sft"
+    assert cfg.data.sft_path.endswith(".jsonl")
+    assert cfg.train.init_from
+    assert cfg.train.seq_len_warmup_tokens == 0
+    assert cfg.optim.muon_lr < load_config(TRAIN / "pretrain-16gb.yaml").optim.muon_lr
+    assert cfg.train.grad_accum_steps() >= 8
+    assert estimate_memory(cfg).total < (15.0 if "16gb" in name else 11.5)
