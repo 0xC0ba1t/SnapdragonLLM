@@ -15,6 +15,7 @@ import argparse
 from snapdragon.config.io import load_config
 from snapdragon.distributed.env import cleanup_distributed
 from snapdragon.train.setup import build_trainer, device_summary
+from snapdragon.utils.device import configure_backends
 from snapdragon.utils.logging import get_logger, setup_logging
 
 log = get_logger("train")
@@ -27,6 +28,7 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("overrides", nargs="*", help="section.key=value")
     args = ap.parse_args(argv)
 
+    configure_backends()  # before any CUDA allocation so the allocator settings take effect
     setup_logging()
     cfg = load_config(args.config, args.overrides)
     trainer = build_trainer(cfg, device=args.device)

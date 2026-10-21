@@ -22,3 +22,15 @@ def test_autocast_dtype(name, dtype):
 def test_autocast_dtype_rejects_unknown():
     with pytest.raises(ValueError, match="unknown precision"):
         autocast_dtype("int4")
+
+
+def test_configure_backends_sets_allocator_and_precision_without_clobbering_user_choice():
+    from snapdragon.utils.device import configure_backends
+
+    env = {}
+    applied = configure_backends(env)
+    assert env["PYTORCH_CUDA_ALLOC_CONF"] == "expandable_segments:True"
+    assert applied["matmul_precision"] == "high"
+
+    user = {"PYTORCH_CUDA_ALLOC_CONF": "max_split_size_mb:128"}
+    assert configure_backends(user)["alloc_conf"] == "max_split_size_mb:128"
