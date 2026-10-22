@@ -129,3 +129,20 @@ def test_sequence_length_warmup_grows_while_tokens_per_step_stay_constant(make_t
     assert lens[-1] == 16
     assert lens == sorted(lens)
     assert set(tokens) == {64}
+
+
+def test_to_host_flattens_scalars_and_vectors_in_order():
+    from snapdragon.train.trainer import to_host
+
+    out = to_host(torch.tensor([1.0, 2.0, 3.0]), torch.tensor(4.0), torch.tensor([5]))
+    assert out == [1.0, 2.0, 3.0, 4.0, 5.0]
+
+
+def test_a_train_step_fetches_its_scalars_with_a_single_host_copy(make_trainer, monkeypatch):
+    import snapdragon.train.trainer as mod
+
+    calls = []
+    real = mod.to_host
+    monkeypatch.setattr(mod, "to_host", lambda *t: (calls.append(len(t)), real(*t))[1])
+    make_trainer().train_step()
+    assert calls == [2]  # (stats, grad norm) in one call: one synchronisation per optimizer step

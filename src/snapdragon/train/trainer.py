@@ -17,6 +17,13 @@ from snapdragon.train.precision import autocast_context
 from snapdragon.train.state import TrainState
 
 
+def to_host(*tensors: torch.Tensor) -> list[float]:
+    """Fetch several scalar tensors with ONE device-to-host copy (each ``float(t)`` on a CUDA tensor is
+    a separate synchronisation that stalls the CPU until the GPU catches up)."""
+    flat = torch.cat([t.detach().reshape(-1).float() for t in tensors])
+    return flat.tolist()
+
+
 class Trainer:
     """Runs optimizer steps; everything optional (logging, checkpoints, eval) is a callback.
 
@@ -83,8 +90,8 @@ class Trainer:
         stats = self._reduce(stats)
         norm = clip_grad_norm(self.raw_model.parameters(), self.cfg.optim.grad_clip)
 
-        loss_val, ce_val, z_val = (float(v) for v in stats)
-        finite = math.isfinite(loss_val) and bool(torch.isfinite(norm))
+        loss_val, ce_val, z_val, norm_val = to_host(stats, norm)
+        finite = math.isfinite(loss_val) and math.isfinite(norm_val)
         spike = (
             cfg.loss_spike_factor > 0
             and self.state.loss_ema > 0
@@ -106,7 +113,7 @@ class Trainer:
             "loss": loss_val,
             "ce": ce_val,
             "z": z_val,
-            "grad_norm": float(norm),
+            "grad_norm": norm_val,
             "lr": lr,
             "tokens_seen": self.state.tokens_seen,
             "seq_len": seq_len,
