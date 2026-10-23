@@ -84,12 +84,13 @@ def run_benchmark(cfg: Config, steps: int = 5, warmup: int = 2, device: str | No
     dt = (time.perf_counter() - t0) / steps
     tokens = cfg.train.global_batch_tokens
     tps = tokens / dt
-    peak = torch.cuda.get_device_name(dev) if dev.type == "cuda" else None
+    gpu_name = torch.cuda.get_device_name(dev) if dev.type == "cuda" else None
+    peak_tflops = peak_tflops_for(gpu_name) if gpu_name else None
     return BenchmarkResult(
         steps=steps,
         seconds_per_step=dt,
         tokens_per_sec=tps,
-        mfu=mfu(tps, cfg.model, peak_tflops_for(peak), cfg.train.seq_len) if peak and peak_tflops_for(peak) else None,
+        mfu=mfu(tps, cfg.model, peak_tflops, cfg.train.seq_len) if peak_tflops else None,
         peak_memory_gb=torch.cuda.max_memory_allocated(dev) / 1e9 if dev.type == "cuda" else None,
         tokens_per_step=tokens,
     )
