@@ -86,3 +86,40 @@ def test_maybe_resume_respects_config(make_trainer, cfg):
     fresh = make_trainer(cfg, seed=9)
     assert maybe_resume(fresh) is True
     assert fresh.state.step == 1
+
+
+class _Counter:
+    """A minimal stateful extra component."""
+
+    def __init__(self):
+        self.n = 0
+
+    def state_dict(self):
+        return {"n": self.n}
+
+    def load_state_dict(self, state):
+        self.n = state["n"]
+
+
+def test_extra_state_is_saved_and_restored(make_trainer, cfg):
+    a = make_trainer(cfg)
+    a.extra_state["counter"] = _Counter()
+    a.extra_state["counter"].n = 41
+    a.train_step()
+    path = save_trainer_checkpoint(a)
+    assert "extra_counter" in load_checkpoint(path)
+
+    b = make_trainer(cfg)
+    b.extra_state["counter"] = _Counter()
+    restore_trainer(b, load_checkpoint(path))
+    assert b.extra_state["counter"].n == 41
+
+
+def test_checkpoints_without_the_extra_component_still_load(make_trainer, cfg):
+    a = make_trainer(cfg)
+    a.train_step()
+    path = save_trainer_checkpoint(a)
+    b = make_trainer(cfg)
+    b.extra_state["counter"] = _Counter()  # a component added after the checkpoint was written
+    restore_trainer(b, load_checkpoint(path))
+    assert b.extra_state["counter"].n == 0

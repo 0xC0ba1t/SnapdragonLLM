@@ -57,6 +57,9 @@ class Trainer:
         self.grad_accum_steps = cfg.train.grad_accum_steps(world_size)
         self.total_steps = cfg.train.total_steps
         self.stop_requested = False
+        # extra stateful components (e.g. weight EMA) that must be checkpointed with the run:
+        # name -> object with state_dict() / load_state_dict()
+        self.extra_state: dict[str, object] = {}
 
     @property
     def is_main(self) -> bool:

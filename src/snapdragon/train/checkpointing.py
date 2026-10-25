@@ -24,7 +24,9 @@ def checkpoint_root(trainer) -> Path:
 def trainer_components(trainer) -> dict:
     """Everything needed to continue a run bit-for-bit: weights, optimizer (incl. int8 state), LR
     schedule position, data position, RNG streams, progress counters, plus the config for provenance."""
+    extras = {f"extra_{name}": obj.state_dict() for name, obj in trainer.extra_state.items()}
     return {
+        **extras,
         "model": trainer.raw_model.state_dict(),
         "optim": trainer.optimizer.state_dict(),
         "schedule": trainer.schedule.state_dict(),
@@ -50,6 +52,9 @@ def restore_trainer(trainer, components: dict, restore_rng: bool = True) -> None
     trainer.schedule.load_state_dict(components["schedule"])
     trainer.state.load_state_dict(components["trainer_state"])
     trainer.train_loader.load_state_dict(components["loader"])
+    for name, obj in trainer.extra_state.items():
+        if f"extra_{name}" in components:
+            obj.load_state_dict(components[f"extra_{name}"])
     if restore_rng:
         set_rng_state(components["rng"])
 
