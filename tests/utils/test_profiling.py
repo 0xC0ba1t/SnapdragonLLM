@@ -18,9 +18,10 @@ def test_profile_run_writes_a_chrome_trace_and_an_ops_table(tmp_path):
 
 
 def test_profile_run_creates_missing_directories(tmp_path):
-    with profile_run(tmp_path / "a" / "b", wait=0, warmup=0, active=1) as prof:
-        torch.ones(2).sum()
-        prof.step()
+    with profile_run(tmp_path / "a" / "b", wait=0, warmup=1, active=1) as prof:
+        for _ in range(2):
+            torch.ones(2).sum()
+            prof.step()
     assert (tmp_path / "a" / "b" / "trace.json").exists()
 
 

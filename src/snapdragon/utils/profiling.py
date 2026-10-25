@@ -26,7 +26,7 @@ def profile_run(out_dir: str | Path, wait: int = 1, warmup: int = 1, active: int
     sort_key = "self_cuda_time_total" if torch.cuda.is_available() else "self_cpu_time_total"
     prof = profile(
         activities=activities, schedule=schedule(wait=wait, warmup=warmup, active=active, repeat=1),
-        record_shapes=True, profile_memory=True, with_stack=False,
+        record_shapes=True, profile_memory=True, with_stack=False, acc_events=True,
     )
     with prof:
         yield prof
