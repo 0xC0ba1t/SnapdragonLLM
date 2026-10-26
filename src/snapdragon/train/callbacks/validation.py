@@ -27,7 +27,8 @@ def evaluate_loss(trainer, val_loader) -> float:
 
 
 class ValLossCallback(Callback):
-    """Adds ``val_loss`` and ``val_ppl`` to the metrics every ``every`` steps (and on the last)."""
+    """Adds ``val_loss`` and ``val_ppl`` (and ``val_loss_ema`` when a weight EMA is registered) to the
+    metrics every ``every`` steps and on the last step."""
 
     priority = 30
 
@@ -42,3 +43,7 @@ class ValLossCallback(Callback):
         metrics["val_loss"] = loss
         metrics["val_ppl"] = math.exp(min(loss, 20.0))
         trainer.state.best_val_loss = min(trainer.state.best_val_loss, loss)
+        ema = trainer.extra_state.get("ema")
+        if ema is not None:  # also score the averaged weights; they are usually the better model
+            with ema.applied(trainer.raw_model):
+                metrics["val_loss_ema"] = evaluate_loss(trainer, self.val_loader)

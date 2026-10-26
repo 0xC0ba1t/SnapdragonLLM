@@ -73,3 +73,24 @@ def test_runs_inside_fit_before_loggers(make_trainer):
     t = make_trainer(callbacks=[Spy(), ValLossCallback(_val_batches(1), every=10)])
     t.fit()
     assert seen == [10, 20, 30]
+
+
+def test_ema_weights_get_their_own_validation_metric(make_trainer):
+    from snapdragon.train.ema import WeightEMA
+
+    cb = ValLossCallback(_val_batches(2), every=1)
+    t = make_trainer(callbacks=[cb])
+    m = {"step": 1}
+    cb.on_step_end(t, m)
+    assert "val_loss_ema" not in m  # no EMA registered
+
+    t.extra_state["ema"] = WeightEMA(t.raw_model, decay=0.9)
+    for _ in range(6):
+        t.train_step()
+        t.extra_state["ema"].update(t.raw_model)
+    before = {n: p.detach().clone() for n, p in t.raw_model.named_parameters()}
+    m2 = {"step": 2}
+    cb.on_step_end(t, m2)
+    assert m2["val_loss_ema"] != m2["val_loss"]  # the shadow weights lag the live ones
+    for n, p in t.raw_model.named_parameters():
+        assert torch.equal(p, before[n])  # live weights are restored afterwards
