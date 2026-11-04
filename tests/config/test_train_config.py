@@ -40,3 +40,11 @@ def test_parallel_modes():
     assert TrainConfig(parallel="none").parallel == "none"
     with pytest.raises(ValueError, match="parallel"):
         TrainConfig(parallel="fsdp")
+
+
+def test_ema_decay_bounds():
+    assert TrainConfig().ema_decay == 0.0
+    assert TrainConfig(ema_decay=0.999).ema_decay == 0.999
+    for bad in (-0.1, 1.0):
+        with pytest.raises(ValueError, match="ema_decay"):
+            TrainConfig(ema_decay=bad)

@@ -153,3 +153,20 @@ def test_init_from_starts_a_new_run_from_pretrained_weights(tiny_config, tmp_pat
         assert torch.equal(fresh.raw_model.transformer.embed.weight, base.raw_model.transformer.embed.weight)
     finally:
         fresh.train_loader.close()
+
+
+def test_ema_callback_is_added_and_checkpointed_when_configured(tiny_config, tmp_path):
+    from snapdragon.checkpoint.io import load_checkpoint
+    from snapdragon.train.checkpointing import save_trainer_checkpoint
+    from snapdragon.train.ema import EMACallback
+
+    cfg = _cfg(tiny_config, tmp_path)
+    cfg.train.ema_decay = 0.99
+    t = build_trainer(cfg, device="cpu")
+    try:
+        assert any(isinstance(c, EMACallback) for c in t.callbacks)
+        t.callbacks.on_train_start(t)
+        t.train_step()
+        assert "extra_ema" in load_checkpoint(save_trainer_checkpoint(t))
+    finally:
+        t.train_loader.close()

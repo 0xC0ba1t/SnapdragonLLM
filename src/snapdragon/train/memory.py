@@ -24,16 +24,17 @@ class MemoryEstimate:
     activations: float
     logits: float
     overhead: float
+    ema: float = 0.0
 
     @property
     def total(self) -> float:
-        return self.weights + self.grads + self.optimizer + self.activations + self.logits + self.overhead
+        return self.weights + self.grads + self.optimizer + self.activations + self.logits + self.overhead + self.ema
 
     def rows(self) -> list[tuple[str, float]]:
         return [("weights (fp32 master)", self.weights), ("gradients (fp32)", self.grads),
                 ("optimizer state", self.optimizer), ("activations", self.activations),
                 ("loss logits chunk", self.logits), ("workspace + cuda context", self.overhead),
-                ("TOTAL", self.total)]
+                *([("weight EMA (fp32)", self.ema)] if self.ema else []), ("TOTAL", self.total)]
 
 
 def activation_bytes_per_token_per_layer(cfg, mode: str) -> float:
@@ -84,6 +85,7 @@ def estimate_memory(cfg: Config) -> MemoryEstimate:
         activations=acts / GB,
         logits=logits / GB,
         overhead=1.0,
+        ema=n_params * 4 / GB if t.ema_decay > 0 else 0.0,
     )
 
 

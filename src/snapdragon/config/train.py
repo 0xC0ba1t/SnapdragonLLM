@@ -33,6 +33,7 @@ class TrainConfig:
     save_every: int = 500
     keep_last_n: int = 3
     resume: str = "auto"  # auto | none | path to a checkpoint
+    ema_decay: float = 0.0  # weight EMA (0 disables); costs one extra fp32 copy of the model
     task: str = "pretrain"  # pretrain | sft
     init_from: str = ""  # checkpoint to take initial *weights* from (fresh optimizer/schedule), e.g. for sft
     parallel: str = "ddp"  # ddp | none (data parallel when launched with torchrun)
@@ -44,6 +45,8 @@ class TrainConfig:
     def __post_init__(self) -> None:
         if self.precision not in PRECISIONS:
             raise ValueError(f"precision must be one of {PRECISIONS}, got {self.precision!r}")
+        if not 0.0 <= self.ema_decay < 1.0:
+            raise ValueError("ema_decay must be in [0, 1)")
         if self.task not in ("pretrain", "sft"):
             raise ValueError("task must be pretrain or sft")
         if self.parallel not in ("ddp", "none"):

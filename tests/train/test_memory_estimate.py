@@ -72,3 +72,14 @@ def test_per_layer_activation_ordering():
 def test_default_ce_chunk_keeps_logit_memory_under_a_gigabyte():
     # 2048 tokens x 32768 vocab x (fp32 logits + fp32 grad + bf16 copy)
     assert estimate_memory(cfg_500m()).logits < 1.0
+
+
+def test_weight_ema_adds_one_fp32_copy_to_the_budget():
+    base = estimate_memory(cfg_500m())
+    c = cfg_500m()
+    c.train.ema_decay = 0.999
+    with_ema = estimate_memory(c)
+    assert with_ema.ema == pytest.approx(base.weights)
+    assert with_ema.total == pytest.approx(base.total + base.weights)
+    assert any(name.startswith("weight EMA") for name, _ in with_ema.rows())
+    assert not any(name.startswith("weight EMA") for name, _ in base.rows())

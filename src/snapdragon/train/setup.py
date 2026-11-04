@@ -25,6 +25,7 @@ from snapdragon.train.callbacks.monitors import DivergenceGuard, MemoryCallback,
 from snapdragon.train.callbacks.throughput import ThroughputCallback
 from snapdragon.train.callbacks.validation import ValLossCallback
 from snapdragon.train.checkpointing import maybe_resume
+from snapdragon.train.ema import EMACallback
 from snapdragon.train.trainer import Trainer
 from snapdragon.utils.device import get_device
 from snapdragon.utils.logging import get_logger
@@ -85,6 +86,8 @@ def build_trainer(
     else:
         loader = build_train_loader(cfg, rank, world_size)
     callbacks = default_callbacks(cfg) + list(extra_callbacks or [])
+    if cfg.train.ema_decay > 0:
+        callbacks.append(EMACallback(cfg.train.ema_decay))
     if val_loader is None and cfg.data.sources:
         try:
             val_loader = build_val_loader(cfg, rank, world_size)
