@@ -28,7 +28,7 @@ def test_batch_index_counts_consumed_not_prefetched(ds_path):
     with PrefetchLoader(_builder(ds_path), depth=4) as pre:
         for _ in range(3):
             next(pre)
-        assert pre.state_dict() == {"batch_index": 3}
+        assert pre.state_dict() == {"batch_index": 3, "global_samples": 12}
 
 
 def test_start_batch(ds_path):
@@ -65,4 +65,33 @@ def test_load_state_dict_seeks_and_discards_prefetched_batches(ds_path):
         pre.load_state_dict({"batch_index": 5})
         assert pre.batch_index == 5
         assert torch.equal(next(pre).x, expected)
-        assert pre.state_dict() == {"batch_index": 6}
+        assert pre.state_dict() == {"batch_index": 6, "global_samples": 24}
+
+
+def test_state_records_global_samples_and_resumes_on_a_different_world_size(ds_path):
+    """Two ranks consume 3 batches; a single rank must resume exactly where the pair left off."""
+    ranks = [BatchBuilder([TokenDataset(ds_path)], [1.0], seq_len=16, micro_batch_size=2, seed=3, rank=r, world_size=2)
+             for r in range(2)]
+    loaders = [PrefetchLoader(b, depth=2) for b in ranks]
+    try:
+        for _ in range(3):
+            for ld in loaders:
+                next(ld)
+        state = loaders[0].state_dict()
+    finally:
+        for ld in loaders:
+            ld.close()
+    assert state == {"batch_index": 3, "global_samples": 12}
+
+    solo_builder = BatchBuilder([TokenDataset(ds_path)], [1.0], seq_len=16, micro_batch_size=4, seed=3)
+    expected = solo_builder.get_batch(3)[0]  # the single-process batch that follows 12 consumed samples
+    with PrefetchLoader(BatchBuilder([TokenDataset(ds_path)], [1.0], seq_len=16, micro_batch_size=4, seed=3),
+                        depth=2) as solo:
+        solo.load_state_dict(state)
+        assert solo.batch_index == 3  # 12 samples / (4 x 1)
+        assert torch.equal(next(solo).x, expected)
+
+
+def test_resume_at_a_position_that_does_not_fit_the_new_layout_is_an_error(ds_path):
+    with PrefetchLoader(_builder(ds_path), depth=1) as pre, pytest.raises(ValueError, match="cannot resume"):
+        pre.load_state_dict({"batch_index": 1, "global_samples": 6})  # micro-batch 4: 6 is not a multiple

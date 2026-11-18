@@ -8,6 +8,7 @@ import torch
 
 from snapdragon.data.batches import BatchBuilder
 from snapdragon.data.loader import Batch
+from snapdragon.data.sampler import batch_index_for, global_samples
 
 _END = object()
 
@@ -68,12 +69,19 @@ class PrefetchLoader:
         return item
 
     def state_dict(self) -> dict:
-        return {"batch_index": self.batch_index}
+        b = self.builder
+        return {"batch_index": self.batch_index,
+                "global_samples": global_samples(self.batch_index, b.micro_batch_size, b.world_size)}
 
     def load_state_dict(self, state: dict) -> None:
-        """Seek: stop the worker, drop everything prefetched, restart at the saved batch."""
+        """Seek: stop the worker, drop everything prefetched, restart at the saved position. The position is
+        stored as a global sample count, so it maps onto this run's rank/batch layout even if it differs."""
         self.close()
-        self.batch_index = int(state["batch_index"])
+        b = self.builder
+        if "global_samples" in state:
+            self.batch_index = batch_index_for(state["global_samples"], b.micro_batch_size, b.world_size)
+        else:
+            self.batch_index = int(state["batch_index"])
         self._start_worker(self.batch_index)
 
     def close(self) -> None:

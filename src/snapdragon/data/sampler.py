@@ -70,3 +70,23 @@ def batch_sample_indices(batch: int, micro_batch_size: int, rank: int, world_siz
         raise ValueError(f"rank {rank} out of range for world size {world_size}")
     start = (batch * world_size + rank) * micro_batch_size
     return range(start, start + micro_batch_size)
+
+
+def global_samples(batch_index: int, micro_batch_size: int, world_size: int) -> int:
+    """How many samples of the global stream a loader has consumed after ``batch_index`` batches."""
+    return batch_index * micro_batch_size * world_size
+
+
+def batch_index_for(samples: int, micro_batch_size: int, world_size: int) -> int:
+    """The per-rank batch number that resumes the global stream at ``samples``, for ANY world size.
+
+    Raises if the position does not fall on a batch boundary of the new layout (e.g. resuming 3 ranks of
+    micro-batch 2 from a position that is not a multiple of 6): silently rounding would repeat or skip data.
+    """
+    per_round = micro_batch_size * world_size
+    if samples % per_round:
+        raise ValueError(
+            f"cannot resume at global sample {samples} with micro_batch_size={micro_batch_size} x "
+            f"world_size={world_size} (= {per_round} samples per step); choose a layout whose product divides it"
+        )
+    return samples // per_round

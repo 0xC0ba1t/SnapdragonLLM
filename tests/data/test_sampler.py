@@ -69,3 +69,14 @@ def test_bad_rank():
 
     with pytest.raises(ValueError, match="out of range"):
         batch_sample_indices(0, 2, 2, 2)
+
+
+def test_global_sample_conversions_roundtrip():
+    from snapdragon.data.sampler import batch_index_for, global_samples
+
+    assert global_samples(5, 4, 2) == 40
+    assert batch_index_for(40, 4, 2) == 5
+    assert batch_index_for(40, 8, 1) == 5
+    assert batch_index_for(0, 3, 7) == 0
+    with pytest.raises(ValueError, match="cannot resume"):
+        batch_index_for(40, 3, 4)
