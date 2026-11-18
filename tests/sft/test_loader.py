@@ -46,3 +46,25 @@ def test_ranks_partition_a_global_batch():
 def test_empty_dataset_is_rejected():
     with pytest.raises(ValueError, match="empty"):
         SFTLoader(PackedRows(*(torch.empty(0, 4, dtype=torch.long) for _ in range(3))), 2)
+
+
+def test_state_survives_a_change_of_world_size():
+    pair = [SFTLoader(_rows(), 2, seed=5, rank=r, world_size=2) for r in range(2)]
+    for _ in range(3):
+        for ld in pair:
+            next(ld)
+    state = pair[0].state_dict()
+    assert state == {"batch_index": 3, "global_samples": 12}
+
+    solo = SFTLoader(_rows(), 4, seed=5)
+    solo.load_state_dict(state)
+    reference = SFTLoader(_rows(), 4, seed=5)
+    for _ in range(3):
+        next(reference)
+    assert torch.equal(next(solo).x, next(reference).x)  # continues the same global stream
+
+
+def test_legacy_state_without_global_samples_still_loads():
+    ld = SFTLoader(_rows(), 2)
+    ld.load_state_dict({"batch_index": 4})
+    assert ld.batch_index == 4

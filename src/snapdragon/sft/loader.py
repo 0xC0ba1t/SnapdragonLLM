@@ -4,7 +4,12 @@ from __future__ import annotations
 import torch
 
 from snapdragon.data.loader import Batch
-from snapdragon.data.sampler import EpochPermutation, batch_sample_indices
+from snapdragon.data.sampler import (
+    EpochPermutation,
+    batch_index_for,
+    batch_sample_indices,
+    global_samples,
+)
 from snapdragon.sft.packing import PackedRows
 
 
@@ -32,7 +37,11 @@ class SFTLoader:
         return Batch(self.rows.x[sel], self.rows.y[sel], self.rows.position_ids[sel])
 
     def state_dict(self) -> dict:
-        return {"batch_index": self.batch_index}
+        return {"batch_index": self.batch_index,
+                "global_samples": global_samples(self.batch_index, self.micro_batch_size, self.world_size)}
 
     def load_state_dict(self, state: dict) -> None:
-        self.batch_index = int(state["batch_index"])
+        if "global_samples" in state:  # layout-independent position
+            self.batch_index = batch_index_for(state["global_samples"], self.micro_batch_size, self.world_size)
+        else:
+            self.batch_index = int(state["batch_index"])
