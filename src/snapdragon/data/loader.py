@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import torch
 
 from snapdragon.data.batches import BatchBuilder
+from snapdragon.data.sampler import batch_index_for, global_samples
 
 
 @dataclass
@@ -61,7 +62,13 @@ class TrainLoader:
         return Batch(x, y)
 
     def state_dict(self) -> dict:
-        return {"batch_index": self.batch_index}
+        b = self.builder
+        return {"batch_index": self.batch_index,
+                "global_samples": global_samples(self.batch_index, b.micro_batch_size, b.world_size)}
 
     def load_state_dict(self, state: dict) -> None:
-        self.batch_index = int(state["batch_index"])
+        b = self.builder
+        if "global_samples" in state:  # layout-independent position (see PrefetchLoader.load_state_dict)
+            self.batch_index = batch_index_for(state["global_samples"], b.micro_batch_size, b.world_size)
+        else:
+            self.batch_index = int(state["batch_index"])

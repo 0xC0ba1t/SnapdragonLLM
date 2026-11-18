@@ -74,3 +74,20 @@ def test_regroup_requires_a_divisor():
 
     with pytest.raises(ValueError, match="must divide"):
         Batch(torch.zeros(1, 10, dtype=torch.long), torch.zeros(1, 10, dtype=torch.long)).regroup(3)
+
+
+def test_train_loader_state_is_layout_independent(ds_path):
+    two_ranks = [TrainLoader(BatchBuilder([TokenDataset(ds_path)], [1.0], 16, 2, seed=3, rank=r, world_size=2))
+                 for r in range(2)]
+    for _ in range(2):
+        for ld in two_ranks:
+            next(ld)
+    state = two_ranks[0].state_dict()
+    assert state == {"batch_index": 2, "global_samples": 8}
+
+    solo = TrainLoader(_builder(ds_path))  # micro-batch 4, one rank: 8 samples = 2 batches
+    solo.load_state_dict(state)
+    assert solo.batch_index == 2
+    legacy = TrainLoader(_builder(ds_path))
+    legacy.load_state_dict({"batch_index": 7})  # checkpoints from before this field still load
+    assert legacy.batch_index == 7
