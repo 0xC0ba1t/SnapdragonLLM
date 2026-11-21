@@ -11,7 +11,9 @@ falls back to the stock fused AdamW (``build_fsdp_optimizer``), which understand
 from __future__ import annotations
 
 import torch
+import torch.distributed as dist
 from torch import nn
+from torch.distributed.device_mesh import init_device_mesh
 
 from snapdragon.config.optim import OptimConfig
 from snapdragon.optim.param_groups import split_params
@@ -22,6 +24,12 @@ except ImportError:  # pragma: no cover
     from torch.distributed._composable.fsdp import MixedPrecisionPolicy, fully_shard
 
 
+def mesh_device_type(model: nn.Module) -> str:
+    """The device mesh must match where the parameters are, not whether a GPU happens to exist."""
+    first = next(model.parameters(), None)
+    return "cuda" if first is not None and first.is_cuda else "cpu"
+
+
 def wrap_fsdp2(model: nn.Module, param_dtype: torch.dtype = torch.bfloat16) -> nn.Module:
     """Shard each transformer block, then the root (embeddings + final norm).
 
@@ -29,10 +37,11 @@ def wrap_fsdp2(model: nn.Module, param_dtype: torch.dtype = torch.bfloat16) -> n
     reduce-scattered in fp32. Sharding per block keeps at most one block's full weights alive.
     """
     mp = MixedPrecisionPolicy(param_dtype=param_dtype, reduce_dtype=torch.float32)
+    mesh = init_device_mesh(mesh_device_type(model), (dist.get_world_size(),))
     transformer = model.transformer if hasattr(model, "transformer") else model
     for block in transformer.blocks:
-        fully_shard(block, mp_policy=mp)
-    fully_shard(model, mp_policy=mp)
+        fully_shard(block, mesh=mesh, mp_policy=mp)
+    fully_shard(model, mesh=mesh, mp_policy=mp)
     return model
 
 

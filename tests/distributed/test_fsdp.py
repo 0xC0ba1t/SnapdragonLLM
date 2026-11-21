@@ -31,3 +31,11 @@ def test_sharded_training_step_matches_unsharded():
         assert r["loss"] == pytest.approx(ref_loss, rel=1e-4)
         assert r["weight_sum"] == pytest.approx(ref_weight_sum, rel=1e-3)
     assert isinstance(torch.tensor(0.0), torch.Tensor)
+
+
+def test_mesh_device_type_follows_the_parameters_not_cuda_availability(monkeypatch):
+    from snapdragon.distributed.fsdp import mesh_device_type
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    assert mesh_device_type(torch.nn.Linear(2, 2)) == "cpu"
+    assert mesh_device_type(torch.nn.Module()) == "cpu"

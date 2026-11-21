@@ -28,3 +28,19 @@ def test_ddp_gradients_equal_single_process_full_batch_gradients():
         assert torch.allclose(ranks[0][name], ranks[1][name], atol=1e-6), name
         # ...which equals the gradient of the whole batch on one process
         assert torch.allclose(ranks[0][name], ref[name], atol=1e-5), name
+
+
+def test_ddp_device_ids_follow_where_the_model_lives_not_whether_cuda_exists(monkeypatch):
+    """Regression: on a machine with GPUs, a CPU model got device_ids=[rank] and the spawned workers crashed."""
+    from snapdragon.distributed.wrap import ddp_device_ids
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)  # pretend the machine has GPUs
+    cpu_model = torch.nn.Linear(2, 2)
+    assert ddp_device_ids(cpu_model, DistEnv(1, 1, 2)) is None
+    assert ddp_device_ids(torch.nn.Module(), DistEnv(0, 0, 2)) is None  # no parameters at all
+
+    class Fake(torch.nn.Module):
+        def parameters(self, recurse=True):
+            return iter([type("P", (), {"is_cuda": True})()])
+
+    assert ddp_device_ids(Fake(), DistEnv(1, 1, 2)) == [1]

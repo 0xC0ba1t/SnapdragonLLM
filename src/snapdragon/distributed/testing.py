@@ -4,6 +4,7 @@ Workers live in the library, not in test files, because spawned children must be
 """
 from __future__ import annotations
 
+import faulthandler
 import os
 import socket
 import sys
@@ -27,6 +28,7 @@ def free_port() -> int:
 
 
 def _entry(rank: int, world_size: int, port: int, fn: Callable, out_dir: str, args: tuple) -> None:
+    faulthandler.enable()  # a native crash (SIGSEGV) prints the Python stack instead of dying silently
     os.environ.update(RANK=str(rank), LOCAL_RANK=str(rank), WORLD_SIZE=str(world_size),
                       MASTER_ADDR="127.0.0.1", MASTER_PORT=str(port))
     torch.set_num_threads(1)
