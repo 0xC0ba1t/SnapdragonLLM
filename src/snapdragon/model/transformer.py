@@ -19,9 +19,12 @@ from snapdragon.nn.rope import RotaryEmbedding
 
 
 def _save_ops() -> set:
-    """Expensive ops whose outputs SAC keeps instead of recomputing (matmuls and attention kernels)."""
+    """Expensive ops whose outputs SAC keeps instead of recomputing: linear-layer matmuls and the fused
+    attention kernels. ``bmm`` is deliberately NOT saved: when no fused attention kernel is available
+    (e.g. a T4 in bf16, where SDPA falls back to the math path) the (T x T) score matrices come from
+    bmm, and saving them keeps O(T^2) memory per layer, which defeats the point of checkpointing."""
     aten = torch.ops.aten
-    names = ["mm", "addmm", "bmm", "_scaled_dot_product_flash_attention",
+    names = ["mm", "addmm", "_scaled_dot_product_flash_attention",
              "_scaled_dot_product_efficient_attention", "_scaled_dot_product_cudnn_attention",
              "_scaled_dot_product_flash_attention_for_cpu"]
     return {getattr(aten, n).default for n in names if hasattr(aten, n)}

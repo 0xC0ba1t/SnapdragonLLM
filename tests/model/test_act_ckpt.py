@@ -82,3 +82,27 @@ def test_sac_recomputes_no_matmuls_unlike_full():
     none, sac, full = _mm_calls("none"), _mm_calls("sac"), _mm_calls("full")
     assert sac == none  # matmul outputs were saved, nothing redone
     assert full > none  # full checkpointing redoes every block's forward matmuls
+
+
+def test_sac_never_saves_bmm_so_unfused_attention_scores_are_recomputed():
+    """Regression: with the math SDPA fallback the T x T scores are bmm outputs. Saving them OOMed a
+    16 GB T4 on the 500M preset (28 layers x 4 x 20 x 2048^2 values)."""
+    from torch.utils.checkpoint import CheckpointPolicy
+
+    from snapdragon.model.transformer import _SAVE, _sac_policy
+
+    assert torch.ops.aten.bmm.default not in _SAVE
+    assert _sac_policy(None, torch.ops.aten.bmm.default) == CheckpointPolicy.PREFER_RECOMPUTE
+    assert _sac_policy(None, torch.ops.aten.mm.default) == CheckpointPolicy.MUST_SAVE
+    assert _sac_policy(None, torch.ops.aten.addmm.default) == CheckpointPolicy.MUST_SAVE
+
+
+def test_sac_with_forced_math_attention_matches_unchecked_gradients():
+    from torch.nn.attention import SDPBackend, sdpa_kernel
+
+    ref_loss, ref = _grads("none")
+    with sdpa_kernel(SDPBackend.MATH):
+        loss, got = _grads("sac")
+    assert loss == pytest.approx(ref_loss, abs=1e-6)
+    for name in ref:
+        assert torch.allclose(got[name], ref[name], atol=1e-6), name
