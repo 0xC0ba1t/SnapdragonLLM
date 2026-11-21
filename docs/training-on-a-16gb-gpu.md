@@ -44,6 +44,21 @@ your overrides. The estimator is deliberately conservative.
 8. **Sequence-length warmup** (512 to 2048 over the first 500M tokens): shorter early contexts are more
    stable at high learning rates. Tokens per step stay constant.
 
+## Smaller presets for quick runs
+
+Before committing weeks to the 500M model, run a small one on your real data. Each is trained for about
+20 tokens per parameter with the same recipe (Muon + 8-bit AdamW, WSD schedule, sequence-length warmup).
+
+| preset | parameters | tokens | predicted memory | rough time on a 4060 Ti-class / 4090 |
+|---|---|---|---|---|
+| `pretrain-25m` | 25M | 0.5B | ~5 GB | 2-4 h / 0.5-1 h |
+| `pretrain-50m` | 52M | 1B | ~5.5 GB | 8-16 h / 2-4 h |
+| `pretrain-125m` | 126M | 10B | n/a (micro-batch 8) | 2-8 days |
+
+Times are FLOP-model estimates at 15-30% utilisation (small models use a GPU less efficiently); they are not
+measurements. The 25M preset is the fastest way to confirm that tokenizer, data, training, evaluation and
+generation all work on your hardware.
+
 ## How accurate is the estimate?
 
 One real data point so far (Colab T4, 500M, `pretrain-16gb` shapes, bf16, `sac`, no compile): predicted

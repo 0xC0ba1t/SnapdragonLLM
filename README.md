@@ -42,7 +42,7 @@ python scripts/estimate_memory.py --config configs/train/pretrain-16gb.yaml
 python scripts/benchmark.py       --config configs/train/pretrain-16gb.yaml --steps 3
 
 # 3. pretrain (re-run the same command to resume; Ctrl-C saves a checkpoint first)
-python scripts/train.py --config configs/train/pretrain-16gb.yaml     # or -12gb / -8gb / -125m
+python scripts/train.py --config configs/train/pretrain-16gb.yaml     # or -12gb / -8gb, or small: -25m / -50m / -125m
 
 # 4. evaluate, generate, fine-tune, export
 python scripts/eval.py --checkpoint runs/snapdragon-500m-16gb/checkpoints \
