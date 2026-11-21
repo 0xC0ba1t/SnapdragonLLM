@@ -44,6 +44,17 @@ your overrides. The estimator is deliberately conservative.
 8. **Sequence-length warmup** (512 to 2048 over the first 500M tokens): shorter early contexts are more
    stable at high learning rates. Tokens per step stay constant.
 
+## How accurate is the estimate?
+
+One real data point so far (Colab T4, 500M, `pretrain-16gb` shapes, bf16, `sac`, no compile): predicted
+**12.5 GB**, measured peak **13.5 GB**, about 8% higher. A T4 has no fused attention kernel, which adds
+transient memory that Ampere or newer cards should not need, but that is not yet measured. Plan for the
+estimate being 10% optimistic and leave headroom: on a 16 GB card (about 14.5 GB usable) the default
+preset is tight, and `model.act_ckpt=full` or `train.micro_batch_size=2` is the safe fallback.
+
+`train.precision=fp32` is a debugging mode: activations are twice as large and the estimator now says so
+(the 16 GB preset no longer fits in fp32, which matches what happened on the T4).
+
 ## How long will it take?
 
 Training FLOPs are `3.61 GFLOPs/token` (`sac`) or `4.73` (`full`, with recompute) at 2048 context.
