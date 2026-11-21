@@ -27,7 +27,7 @@ def main(argv: list[str] | None = None) -> str:
     lines = []
     if args.checkpoint:
         path = resolve_checkpoint(args.checkpoint)
-        meta = load_checkpoint(path, only=["meta", "trainer_state"])
+        meta = load_checkpoint(path, only=["meta", "trainer_state"], weights_only=True)  # safe on foreign files
         from snapdragon.config.loader import from_dict
         from snapdragon.config.schema import Config
 
