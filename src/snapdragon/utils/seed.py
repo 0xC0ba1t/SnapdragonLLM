@@ -35,8 +35,15 @@ def get_rng_state() -> dict:
 
 
 def set_rng_state(state: dict) -> None:
+    """Restore the states captured by `get_rng_state`.
+
+    The generators only accept CPU byte tensors, but a checkpoint loaded with
+    `map_location=<cuda device>` has moved them to the GPU, so bring them back first.
+    Resuming on fewer GPUs than the checkpoint was written on just ignores the extra states.
+    """
     random.setstate(state["python"])
     np.random.set_state(state["numpy"])  # noqa: NPY002
-    torch.set_rng_state(state["torch"])
+    torch.set_rng_state(state["torch"].cpu())
     if "cuda" in state and torch.cuda.is_available():
-        torch.cuda.set_rng_state_all(state["cuda"])
+        for i, s in enumerate(state["cuda"][: torch.cuda.device_count()]):
+            torch.cuda.set_rng_state(s.cpu(), i)
