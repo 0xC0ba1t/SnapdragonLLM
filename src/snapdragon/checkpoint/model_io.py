@@ -26,7 +26,7 @@ def resolve_checkpoint(path: str | Path) -> Path:
 
 def load_model_from_checkpoint(path: str | Path, device: torch.device | str = "cpu") -> tuple[CausalLM, Config]:
     """Build the architecture recorded in the checkpoint and load its weights. Returns (model, config)."""
-    ckpt = load_checkpoint(resolve_checkpoint(path), map_location="cpu", only=["model", "meta"])
+    ckpt = load_checkpoint(resolve_checkpoint(path), map_location="cpu", only=["model", "meta"], weights_only=True)
     cfg = from_dict(Config, ckpt["meta"]["config"])
     model = build_model(cfg, device="meta")
     model.to_empty(device=device)
@@ -42,7 +42,7 @@ _SHAPE_FIELDS = ("vocab_size", "d_model", "n_layers", "n_heads", "n_kv_heads", "
 def load_weights_into(model: CausalLM, path: str | Path, expected: ModelConfig | None = None) -> None:
     """Initialise ``model`` from a checkpoint's weights only (no optimizer, schedule or data position),
     e.g. to start supervised fine-tuning from a pretrained model. Architecture must match."""
-    ckpt = load_checkpoint(resolve_checkpoint(path), map_location="cpu", only=["model", "meta"])
+    ckpt = load_checkpoint(resolve_checkpoint(path), map_location="cpu", only=["model", "meta"], weights_only=True)
     saved = from_dict(Config, ckpt["meta"]["config"]).model
     target = expected or model.cfg
     diff = {f: (getattr(saved, f), getattr(target, f)) for f in _SHAPE_FIELDS if getattr(saved, f) != getattr(target, f)}

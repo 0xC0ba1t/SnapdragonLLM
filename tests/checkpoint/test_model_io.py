@@ -59,3 +59,26 @@ def test_load_weights_into_rejects_a_different_architecture(trained):
     other = build_model(dataclasses.replace(trained.cfg.model, n_layers=3))
     with pytest.raises(ValueError, match="architecture differs.*n_layers"):
         load_weights_into(other, checkpoint_root(trained))
+
+
+class _Payload:
+    """Stands in for malicious pickled code: unpickling would import and call something."""
+
+    def __reduce__(self):
+        import builtins
+
+        return (builtins.print, ("pwned",))
+
+
+def test_loading_for_inference_refuses_pickled_code(trained, capsys):
+    from snapdragon.checkpoint.io import load_checkpoint
+    from snapdragon.checkpoint.model_io import resolve_checkpoint
+
+    step_dir = resolve_checkpoint(checkpoint_root(trained))
+    torch.save({"config": _Payload()}, step_dir / "meta.pt")  # tamper with the checkpoint
+    with pytest.raises(Exception, match="(?i)weights.?only|unsupported|global"):
+        load_model_from_checkpoint(step_dir)
+    assert "pwned" not in capsys.readouterr().out
+    # the permissive loader (used to resume your own runs) would have executed it
+    load_checkpoint(step_dir, only=["meta"])
+    assert "pwned" in capsys.readouterr().out

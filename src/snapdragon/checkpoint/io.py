@@ -64,10 +64,16 @@ def latest_checkpoint(root: str | Path) -> Path | None:
 
 
 def load_checkpoint(
-    path: str | Path, map_location: str | torch.device = "cpu", only: Iterable[str] | None = None
+    path: str | Path, map_location: str | torch.device = "cpu", only: Iterable[str] | None = None,
+    weights_only: bool = False,
 ) -> dict[str, Any]:
     """Load the ``<name>.pt`` components of a checkpoint directory (all, or just those in ``only``;
-    skipping the optimizer state makes loading for inference several times faster)."""
+    skipping the optimizer state makes loading for inference several times faster).
+
+    ``weights_only=True`` refuses anything but tensors and plain containers, so a checkpoint downloaded
+    from someone else cannot run code when loaded. The ``model`` and ``meta`` components are always safe
+    to load this way; resuming training needs the default because the RNG state holds numpy arrays.
+    """
     path = Path(path)
     if not (path / COMPLETE).exists():
         raise FileNotFoundError(f"{path} is not a complete checkpoint (missing {COMPLETE} marker)")
@@ -76,7 +82,7 @@ def load_checkpoint(
     if missing:
         raise KeyError(f"checkpoint {path} has no component(s) {sorted(missing)}")
     return {
-        f.stem: torch.load(f, map_location=map_location, weights_only=False)
+        f.stem: torch.load(f, map_location=map_location, weights_only=weights_only)
         for f in sorted(path.glob("*.pt"))
         if wanted is None or f.stem in wanted
     }
