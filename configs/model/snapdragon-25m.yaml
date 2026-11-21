@@ -1,0 +1,9 @@
+# ~25M params: pipeline checks and the quickest real training run (about 0.5B tokens, hours not days)
+model:
+  vocab_size: 32768
+  d_model: 384
+  n_layers: 8
+  n_heads: 6
+  n_kv_heads: 2
+  mlp_hidden: 1024
+  max_seq_len: 2048

@@ -1,0 +1,9 @@
+# ~52M params: a real small LM for ablations (about 1B tokens, under a day on a mid-range GPU)
+model:
+  vocab_size: 32768
+  d_model: 512
+  n_layers: 12
+  n_heads: 8
+  n_kv_heads: 4
+  mlp_hidden: 1408
+  max_seq_len: 2048
