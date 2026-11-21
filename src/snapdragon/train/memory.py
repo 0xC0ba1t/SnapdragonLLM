@@ -75,9 +75,12 @@ def estimate_memory(cfg: Config) -> MemoryEstimate:
     if mode in ("full", "selective"):
         acts += activation_bytes_per_token_per_layer(m, "none") * tokens  # one block recomputed at a time
     acts += tokens * m.d_model * 2 * 3  # embeddings out, final norm in/out
+    # the per-token formulas above count bf16 (2 byte) activations; without autocast they are fp32
+    fp32 = t.precision == "fp32"
+    acts *= 2.0 if fp32 else 1.0
 
     chunk = min(t.ce_chunk_tokens, tokens)
-    logits = chunk * m.vocab_size * (4 + 4 + 2)  # fp32 logits + fp32 softmax grad + bf16 copy
+    logits = chunk * m.vocab_size * (4 + 4 + (4 if fp32 else 2))  # fp32 logits + fp32 softmax grad + compute-dtype copy
     return MemoryEstimate(
         weights=n_params * 4 / GB,
         grads=n_params * 4 / GB,

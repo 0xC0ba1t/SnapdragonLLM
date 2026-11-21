@@ -83,3 +83,16 @@ def test_weight_ema_adds_one_fp32_copy_to_the_budget():
     assert with_ema.total == pytest.approx(base.total + base.weights)
     assert any(name.startswith("weight EMA") for name, _ in with_ema.rows())
     assert not any(name.startswith("weight EMA") for name, _ in base.rows())
+
+
+def test_fp32_precision_roughly_doubles_activations_and_no_longer_fits_16gb():
+    """Measured on a Colab T4: the 16 GB preset in fp32 ran out of memory (14.5 GB usable), bf16 peaked at
+    13.5 GB. The estimator must reflect that fp32 is much heavier than bf16."""
+    bf16 = estimate_memory(cfg_500m())
+    c = cfg_500m()
+    c.train.precision = "fp32"
+    fp32 = estimate_memory(c)
+    assert fp32.activations == pytest.approx(2 * bf16.activations)
+    assert fp32.logits > bf16.logits
+    assert fp32.weights == bf16.weights  # master weights are fp32 either way
+    assert bf16.total < 14.5 < fp32.total
