@@ -1,0 +1,33 @@
+# 52M model, about 20 tokens per parameter (1B tokens): under a day on a mid-range GPU.
+extends: ../model/snapdragon-50m.yaml
+
+model:
+  act_ckpt: none
+
+train:
+  run_name: snapdragon-50m
+  seq_len: 2048
+  micro_batch_size: 8             # keeps the estimate under 8 GB; raise it if you have more memory
+  global_batch_tokens: 262144     # 16 micro-batches per step
+  max_tokens: 1_000_000_000
+  precision: bf16
+  compile: auto
+  seq_len_start: 512
+  seq_len_warmup_tokens: 100_000_000
+  save_every: 500
+  keep_last_n: 3
+  loss_spike_factor: 3.0
+
+data:
+  seq_len: 2048
+  sources:
+    - name: fineweb-edu
+      path: data/fineweb-edu
+
+optim:
+  muon_lr: 0.02
+  adam_lr: 0.0008
+  scheduler:
+    kind: wsd
+    warmup_steps: 200
+    decay_fraction: 0.2

@@ -1,0 +1,34 @@
+# 25M model, about 20 tokens per parameter (0.5B tokens): finishes in hours on a mid-range GPU.
+# Good for checking the whole pipeline end to end on real data before spending days on bigger runs.
+extends: ../model/snapdragon-25m.yaml
+
+model:
+  act_ckpt: none
+
+train:
+  run_name: snapdragon-25m
+  seq_len: 2048
+  micro_batch_size: 16
+  global_batch_tokens: 131072     # smaller models like smaller batches: 4 micro-batches per step
+  max_tokens: 500_000_000
+  precision: bf16
+  compile: auto
+  seq_len_start: 512
+  seq_len_warmup_tokens: 50_000_000
+  save_every: 500
+  keep_last_n: 3
+  loss_spike_factor: 3.0
+
+data:
+  seq_len: 2048
+  sources:
+    - name: fineweb-edu
+      path: data/fineweb-edu
+
+optim:
+  muon_lr: 0.02
+  adam_lr: 0.001
+  scheduler:
+    kind: wsd
+    warmup_steps: 200
+    decay_fraction: 0.2

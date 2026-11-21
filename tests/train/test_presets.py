@@ -62,3 +62,23 @@ def test_sft_presets_are_wired_for_chat_data(name):
     assert cfg.optim.muon_lr < load_config(TRAIN / "pretrain-16gb.yaml").optim.muon_lr
     assert cfg.train.grad_accum_steps() >= 8
     assert estimate_memory(cfg).total < (15.0 if "16gb" in name else 11.5)
+
+
+@pytest.mark.parametrize(
+    ("name", "lo", "hi", "budget_gb"),
+    [("pretrain-25m", 23e6, 28e6, 7.5), ("pretrain-50m", 48e6, 56e6, 7.5)],
+)
+def test_small_presets_are_chinchilla_sized_and_fit_an_8gb_gpu(name, lo, hi, budget_gb):
+    cfg = load_config(TRAIN / f"{name}.yaml")
+    n = cfg.model.num_params()
+    assert lo < n < hi
+    assert 15 < cfg.train.max_tokens / n < 25  # about 20 training tokens per parameter
+    assert estimate_memory(cfg).total < budget_gb
+    assert cfg.train.grad_accum_steps() >= 4
+    assert cfg.optim.scheduler.kind == "wsd"
+
+
+def test_small_presets_use_smaller_batches_than_the_large_ones():
+    big = load_config(TRAIN / "pretrain-16gb.yaml").train.global_batch_tokens
+    small = [load_config(TRAIN / f"pretrain-{s}.yaml").train.global_batch_tokens for s in ("25m", "50m")]
+    assert small[0] < small[1] < big
