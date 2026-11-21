@@ -54,10 +54,23 @@ python scripts/export_model.py --checkpoint runs/snapdragon-500m-16gb/checkpoint
 
 Smoke-test the whole pipeline on CPU in about a minute: `pytest tests/test_smoke_e2e.py -m slow`.
 
+## Scripts
+
+| script | purpose |
+|---|---|
+| `train_tokenizer.py`, `prepare_data.py`, `inspect_data.py` | build, verify and summarise the tokenizer and token shards |
+| `estimate_memory.py`, `benchmark.py`, `profile_train.py` | predict, measure and profile memory and throughput |
+| `train.py` | pretrain or SFT from a YAML config (resumes automatically; `torchrun` for DDP) |
+| `eval.py`, `inspect_model.py` | benchmarks and perplexity; parameter breakdown and checkpoint state |
+| `generate.py`, `chat.py` | text generation and interactive chat |
+| `prepare_sft.py`, `export_model.py` | chat-data normalisation; safetensors / Hugging Face export |
+| `gen_config_docs.py` | regenerate `docs/configuration.md` |
+
 ## Documentation
 
 * [Architecture](docs/architecture.md) - the model, the fused loss, the optimizers, the package map
 * [Training on one GPU](docs/training-on-a-16gb-gpu.md) - memory budget, presets, realistic timings
+* [Multi-GPU](docs/distributed.md) - DDP, elastic resume, the experimental FSDP2 path
 * [Data](docs/data.md) and [Tokenizer](docs/tokenizer.md)
 * [Evaluation](docs/evaluation.md), [Inference and export](docs/inference.md), [SFT](docs/sft.md)
 * [Configuration reference](docs/configuration.md) (generated from the code)
