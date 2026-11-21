@@ -71,6 +71,21 @@ Measure your own card in a minute:
 
 It prints predicted memory, measured tokens/s, MFU, peak memory, and the projected days.
 
+## Which GPUs work well
+
+Ampere or newer (RTX 30/40, A10/A100, L4) is the intended target: native bf16 and the fused flash
+attention kernel. **Turing/Volta cards (T4, V100, RTX 20xx) run the code but are not a good fit**:
+
+* no hardware bf16, so autocast is emulated or skipped and `torch.compile` skips bf16 graphs;
+* no flash attention, and PyTorch's grouped-query SDPA falls back to the math path, which materialises
+  the (T x T) attention scores;
+* measured on a Colab T4 (16 GB), 500M, fp32: about 0.6k tokens/s (roughly 190 days for 10B tokens),
+  peak 9.1 GB at micro-batch 4. Treat a T4 as a correctness and smoke-test machine only.
+
+If you do hit out-of-memory on such a card, use `model.act_ckpt=full` and a smaller
+`train.micro_batch_size`. (An earlier `sac` policy also kept the math-path score matrices and ran a T4
+out of memory in bf16; that is fixed, but `full` remains the safe choice off Ampere.)
+
 ## Practical notes
 
 * Use Linux or WSL2 for training: `torch.compile` and Triton work there. On native Windows set
