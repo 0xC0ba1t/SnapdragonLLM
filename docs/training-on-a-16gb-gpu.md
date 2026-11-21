@@ -88,6 +88,9 @@ out of memory in bf16; that is fixed, but `full` remains the safe choice off Amp
 
 ## Practical notes
 
+* `act_ckpt: sac` (the 16 GB preset) runs **without** `torch.compile`: selective checkpointing and compiled
+  blocks are incompatible (the backward recompute fails), so compile is skipped with a warning. Use
+  `model.act_ckpt=full` or `selective` if you want compile; benchmark both on your GPU.
 * Use Linux or WSL2 for training: `torch.compile` and Triton work there. On native Windows set
   `train.compile=false`; it still runs, just slower.
 * Re-running the same command resumes from the newest checkpoint. Ctrl-C (or SIGTERM) writes a final
