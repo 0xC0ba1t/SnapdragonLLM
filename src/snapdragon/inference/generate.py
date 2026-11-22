@@ -36,7 +36,8 @@ def stream_generate(
     stops = set(stop_ids)
     generator = None
     if seed is not None:
-        generator = torch.Generator(device="cpu").manual_seed(seed)
+        # torch.multinomial needs the generator on the same device as the probabilities
+        generator = torch.Generator(device=device).manual_seed(seed)
 
     was_training = model.training
     model.eval()

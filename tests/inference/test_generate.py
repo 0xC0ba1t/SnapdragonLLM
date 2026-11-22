@@ -88,3 +88,16 @@ def test_generation_uses_the_cache_not_a_full_recompute(model, monkeypatch):
     monkeypatch.setattr(model.transformer, "forward", spy)
     list(stream_generate(model, [1, 2, 3, 4], 5, GREEDY))
     assert seen == [4, 1, 1, 1, 1]  # one prefill of the prompt, then single-token steps
+
+
+def test_seeded_generator_lives_on_the_models_device(model, monkeypatch):
+    seen = []
+    real = torch.Generator
+
+    def spy(device="cpu"):
+        seen.append(torch.device(device))
+        return real(device="cpu")
+
+    monkeypatch.setattr(torch, "Generator", spy)
+    list(stream_generate(model, [1, 2, 3], 2, SamplingConfig(temperature=1.0), seed=5))
+    assert seen == [next(model.parameters()).device]  # a cpu generator with cuda probabilities raises
