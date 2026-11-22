@@ -85,6 +85,14 @@ single sentence. The best range found was temperature 0.7-0.9 with a repetition 
 * Changing sampling settings trades one failure for another (loops at low temperature, nonsense at high);
   the limit is the size of the model and the amount of data, not the sampler.
 
+### Chat fine-tune (experiment)
+
+The pretrained 25M weights were also fine-tuned on `yahma/alpaca-cleaned` (`configs/train/sft-25m.yaml`, about
+17 minutes on the same two T4s; see [sft.md](sft.md)). Replies take the shape of an answer, but the content
+is still wrong: asked for the capital of France it wrote about Napoleon without saying Paris, and a request
+for a poem produced a paragraph about greenhouse gases. No benchmark was run on the fine-tuned model, and it
+is not recommended for any use.
+
 ### What the first real run found
 
 Running on real GPUs turned up problems that the CPU tests could not, all fixed in this repository:
