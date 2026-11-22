@@ -7,8 +7,9 @@ the whole thing (data, tokenizer, pretraining, fine-tuning, evaluation, generati
 > v3 is a ground-up rewrite. The original GPT-2 124M reproduction lives in [`legacy/v2/`](legacy/v2).
 > OLMo-core was an inspiration for what a production training stack contains; no code was copied.
 
-**Status:** code complete and CPU-tested end to end; the 500M weights have not been trained yet
-(see [model card](docs/model-card.md)). Training time is weeks on a single consumer GPU, see
+**Status:** code complete and CPU-tested end to end. The 25M preset has been trained on two T4s and
+evaluated (a weak model, as expected; results and samples are in the [model card](docs/model-card.md)).
+The 500M weights have not been trained yet; that is weeks on a single consumer GPU, see
 [the honest numbers](docs/training-on-a-16gb-gpu.md).
 
 ## What is in here
@@ -82,11 +83,15 @@ Smoke-test the whole pipeline on CPU in about a minute: `pytest tests/test_smoke
   with `transformers` Qwen3 (logits and greedy generation), numerical equivalence of the fused loss,
   checkpoint resume bit-for-bit, optimizer state round-trips, the data pipeline, and a full
   tokenizer-to-checkpoint-to-resume smoke run.
-* **Written but only runnable on the right hardware:** the CUDA tests (`pytest -m gpu`: numerics and the
-  memory budget of each preset), `torch.compile` (Linux), and the multi-process DDP/FSDP tests (need a
-  working gloo/nccl build; they are skipped otherwise). FSDP2 is experimental and not selectable from
-  `train.py`.
-* **Estimated, not measured:** GPU memory (`estimate_memory.py`) and training time (FLOP model). Use
+* **Verified on real GPUs (a Colab T4 and Kaggle 2x T4):** the 500M model's memory at 2048 context, the
+  gloo DDP tests, and a full 25M pretraining run with DDP, `torch.compile`, checkpointing, resume, evaluation
+  and sampling. Those runs found and fixed several bugs (listed in the model card). The `pytest -m gpu`
+  suite was run on a T4 but not re-run after the latest fixes. Nothing has been verified on 12 GB or 8 GB
+  cards, or with a real 500M training run.
+* **Skipped where the platform cannot run them:** the multi-process tests need a working gloo/nccl build
+  (they are skipped on Windows). FSDP2 is experimental and not selectable from `train.py`.
+* **Estimated, not measured:** GPU memory (`estimate_memory.py`) is optimistic for small models and fp32
+  (it predicted about 8.5 GB for a 25M run that needed 11.6 GB), and training time is a FLOP model. Use
   `scripts/benchmark.py` on your card for real numbers.
 
 ## License
