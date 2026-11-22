@@ -13,7 +13,7 @@ is appended to the context and the model's log-likelihood of the **choice tokens
 
 | task | data | notes |
 |---|---|---|
-| `hellaswag` | rowanz/hellaswag val (10,042) | wikiHow artefacts cleaned as in the harness |
+| `hellaswag` | `Rowan/hellaswag` validation (10,042) | needs the `data` extra; wikiHow artefacts cleaned as in the harness |
 | `arc_easy`, `arc_challenge` | `allenai/ai2_arc` test | needs the `data` extra |
 | `piqa` | PIQA validation | questions and labels are separate files |
 | `lambada` | OpenAI LAMBADA test | accuracy needs *every* token of the last word; also perplexity |
