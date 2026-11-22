@@ -82,3 +82,15 @@ def test_small_presets_use_smaller_batches_than_the_large_ones():
     big = load_config(TRAIN / "pretrain-16gb.yaml").train.global_batch_tokens
     small = [load_config(TRAIN / f"pretrain-{s}.yaml").train.global_batch_tokens for s in ("25m", "50m")]
     assert small[0] < small[1] < big
+
+
+def test_sft_25m_preset_is_wired_for_chat_data_and_the_pretrained_25m_weights():
+    cfg = load_config(TRAIN / "sft-25m.yaml")
+    pretrain = load_config(TRAIN / "pretrain-25m.yaml")
+    assert cfg.train.task == "sft"
+    assert cfg.model == pretrain.model  # init_from needs the same architecture
+    assert cfg.train.init_from.endswith("snapdragon-25m/checkpoints")
+    assert cfg.data.sft_path.endswith(".jsonl")
+    assert cfg.train.seq_len_warmup_tokens == 0
+    assert cfg.optim.muon_lr < pretrain.optim.muon_lr
+    assert cfg.train.grad_accum_steps() >= 2

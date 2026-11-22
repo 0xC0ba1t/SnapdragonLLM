@@ -1,0 +1,26 @@
+# SFT of the 25M model on chat data: the 500M SFT recipe scaled down. Mostly a check that the SFT path works
+# on real hardware: about 2 epochs of alpaca-cleaned (50k conversations) in roughly 17 minutes on two T4s.
+# Prepare data with scripts/prepare_sft.py, pretrain with pretrain-25m.yaml first.
+extends: pretrain-25m.yaml
+
+train:
+  run_name: snapdragon-25m-sft
+  task: sft
+  init_from: runs/snapdragon-25m/checkpoints   # weights only; optimizer and schedule start fresh
+  global_batch_tokens: 65536                    # 4 micro-batches of 8 x 2048 on one GPU, 2 on two
+  max_tokens: 20_000_000                        # about 2 epochs of 50k alpaca conversations, 305 steps
+  seq_len_warmup_tokens: 0
+  save_every: 100
+  loss_spike_factor: 0.0
+
+data:
+  sft_path: data/sft/chat.jsonl
+  tokenizer_path: data/tokenizer/snapdragon-32k.json
+
+optim:
+  muon_lr: 0.004
+  adam_lr: 0.0001
+  scheduler:
+    kind: cosine
+    warmup_steps: 30
+    min_lr_ratio: 0.1
