@@ -8,8 +8,8 @@ model:
 train:
   run_name: snapdragon-25m
   seq_len: 2048
-  micro_batch_size: 16
-  global_batch_tokens: 131072     # smaller models like smaller batches: 4 micro-batches per step
+  micro_batch_size: 8             # 16 ran out of memory at full length on two 15 GB T4s with compile
+  global_batch_tokens: 131072     # smaller models like smaller batches: 4 micro-batches per step on 2 gpus
   max_tokens: 500_000_000
   precision: bf16
   compile: auto
