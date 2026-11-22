@@ -55,6 +55,12 @@ Before committing weeks to the 500M model, run a small one on your real data. Ea
 | `pretrain-50m` | 52M | 1B | ~5.5 GB | 8-16 h / 2-4 h |
 | `pretrain-125m` | 126M | 10B | n/a (micro-batch 8) | 2-8 days |
 
+The memory column is the estimator's prediction and it is optimistic for small models. Measured on two Kaggle
+T4s (fp32, `torch.compile`, DDP), `pretrain-25m` with micro-batch 16 ran out of memory at the full 2048 context
+(over 14.5 GB; the short sequence-length warmup phase had hidden this at 12 GB), and with micro-batch 8 peaked at
+11.6 GB at about 19-29k tokens/s. If a small run runs out of memory, halve `train.micro_batch_size`: the global
+batch stays the same because gradient accumulation makes up the difference.
+
 Times are FLOP-model estimates at 15-30% utilisation (small models use a GPU less efficiently); they are not
 measurements. The 25M preset is the fastest way to confirm that tokenizer, data, training, evaluation and
 generation all work on your hardware.
