@@ -15,7 +15,6 @@ from snapdragon.utils.registry import Registry
 
 TASKS: Registry[Callable[..., Iterator[MCExample]]] = Registry("eval task")
 
-HELLASWAG_URL = "https://raw.githubusercontent.com/rowanz/hellaswag/master/data/hellaswag_val.jsonl"
 PIQA_URL = "https://raw.githubusercontent.com/ybisk/ybisk.github.io/master/piqa/data/valid.jsonl"
 PIQA_LABELS_URL = "https://raw.githubusercontent.com/ybisk/ybisk.github.io/master/piqa/data/valid-labels.lst"
 
@@ -45,7 +44,11 @@ def hellaswag_example(row: dict) -> MCExample:
 
 @TASKS.register("hellaswag")
 def hellaswag(path: str | Path | None = None, limit: int = 0) -> Iterator[MCExample]:
-    for i, row in enumerate(_read_jsonl(path or fetch(HELLASWAG_URL))):
+    """Validation split, from a local jsonl if given, else the Hugging Face copy (same fields as the original).
+
+    The original GitHub repository is no longer available, so there is no stable raw-file URL to fetch."""
+    rows = _read_jsonl(path) if path else _hf_rows("Rowan/hellaswag", "default", "validation")
+    for i, row in enumerate(rows):
         if limit and i >= limit:
             return
         yield hellaswag_example(row)

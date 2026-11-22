@@ -32,6 +32,20 @@ def test_loader_reads_jsonl_and_honours_limit(tmp_path):
     assert [e.label for e in hellaswag(path, limit=3)] == [0, 1, 2]
 
 
+def test_without_a_path_it_reads_the_hugging_face_validation_split(monkeypatch):
+    from snapdragon.eval import tasks
+
+    seen = []
+
+    def fake_rows(name, config, split):
+        seen.append((name, config, split))
+        return iter([{**ROW, "label": "1"}, {**ROW, "label": "2"}])
+
+    monkeypatch.setattr(tasks, "_hf_rows", fake_rows)
+    assert [e.label for e in hellaswag()] == [1, 2]
+    assert seen == [("Rowan/hellaswag", "default", "validation")]
+
+
 def test_registered_under_its_name():
     assert "hellaswag" in TASKS
     assert TASKS.get("hellaswag") is hellaswag
