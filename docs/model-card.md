@@ -44,10 +44,12 @@ Measured with `scripts/eval.py --precision fp32` on one T4, final checkpoint (st
 | ARC-Easy | 2,376 | acc / acc_norm | **42.4%** / 37.3% | about 25% |
 | PIQA | 1,838 | acc / acc_norm | **57.8%** / 57.5% | 50% |
 | LAMBADA | 5,153 | acc / ppl | **15.2%** / 77.9 | about 0% |
+| ARC-Challenge | 1,172 | acc / acc_norm | **17.8%** / 22.7% | about 25% |
 
-ARC-Challenge was not run. The model is clearly above chance only on ARC-Easy and PIQA, and barely above
-it on HellaSwag. These are in line with what models of this size usually reach, but no comparison against
-published numbers has been made here.
+The model is clearly above chance only on ARC-Easy and PIQA, barely above it on HellaSwag, and at chance on
+ARC-Challenge (that test was built from questions that simple word-statistics methods get wrong, so a model
+with no reasoning ability lands there). These are in line with what models of this size usually reach, but
+no comparison against published numbers has been made here.
 
 ### Samples
 
