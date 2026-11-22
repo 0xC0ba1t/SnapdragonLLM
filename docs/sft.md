@@ -43,3 +43,17 @@ an answer in half would teach the model to stop mid-sentence). Position ids rest
 * `max_tokens` counts *rows seen*, so a small dataset is repeated for several epochs; watch for
   overfitting beyond ~3 epochs.
 * Data quality dominates. 10k clean conversations beat 500k noisy ones at this scale.
+
+## What a real run looked like (25M model)
+
+`configs/train/sft-25m.yaml` was run on two T4s over `yahma/alpaca-cleaned` after the 25M pretraining run:
+51,756 conversations packed into 4,649 rows (7.6M trained tokens), 305 steps (about 2 epochs) in about
+17 minutes at roughly 20k tokens/s and 11.6 GB per GPU. The loss, measured on assistant tokens only, fell
+from 4.96 to about 2.65 and flattened after step 200. There is no validation loss for SFT runs: the config
+inherits the pretraining data path, which usually does not exist, so validation is skipped with a warning.
+
+The result shows what SFT can and cannot do at this size. The model answers in the right shape (numbered
+lists, essay-style paragraphs, "In conclusion") but not to the question: asked for the capital of France it
+wrote about Napoleon without naming Paris, and a request for a poem produced a paragraph about greenhouse
+gases. Fine-tuning teaches a format; it cannot add facts that a 25M model never learned. Whether the model
+ends its replies by itself was not settled (all three test replies hit the length cap).
